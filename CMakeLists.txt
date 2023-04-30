@@ -39,8 +39,6 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 find_package(IPP REQUIRED)
 
-add_subdirectory(boost)
-
 target_compile_definitions(KeysightTechnologiesControl PRIVATE 
     _USE_MATH_DEFINES
     _UNICODE
@@ -69,9 +67,9 @@ add_custom_command(
 ) 
 
 target_link_libraries(KeysightTechnologiesControl PRIVATE
-    Boost::log
-    Boost::system
-    Boost::log_setup
+    #Boost::log
+    #Boost::system
+    #Boost::log_setup
 )
 
 include(FetchContent)

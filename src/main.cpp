@@ -215,7 +215,7 @@ struct Sentinel1RawPacket {
 
 int ReadSARParam(std::filesystem::path pathToRawData) {
     int f, res; 
-    uint16_t c, tmp16, NQ = 0;
+    uint16_t tmp16, NQ = 0;
     uint32_t tmp32, Time;
     int Secondary;
     int Count, DataLen, PID, PCAT, Sequence;
@@ -230,51 +230,46 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
     
     int result;
     int numline = 0;
-    int file_swath_number = 0;
-    int file_nq = 0; // for new file creation
     std::ifstream rawData(pathToRawData);
     if (!rawData.is_open()) {
         return -1;
     }
+    Sentinel1RawPacket sentinelOneParam;
 
     do {
-        rawData.read(reinterpret_cast<char*>(&c), 2);
-                
-        c = _byteswap_ushort(c);
-        Secondary = (c >> 11) & 0x01;
-        PID = (c >> 4) & 0x7f;
-        PCAT = (c) & 0xf;
-        printf("%04x: %d(1)\t%d(65)\t%d(12)\t", c, Secondary, PID, PCAT);
+        rawData.read(reinterpret_cast<char*>(&tmp16), 2);
+        tmp16 = _byteswap_ushort(tmp16);
+        sentinelOneParam.PacketVersionNumber = ;
+        sentinelOneParam.PacketType = ;
+        sentinelOneParam.SecondaryHeaderFlag = (tmp16 >> 11) & 0x01;
+        sentinelOneParam.ProcessID = (tmp16 >> 4) & 0x7f;
+        sentinelOneParam.PacketCategory = (tmp16) & 0xf;
 
-        rawData.read(reinterpret_cast<char*>(&c), 2);
-        c = _byteswap_ushort(c);
-        Sequence = (c >> 14);
-        Count = (c & 0x3f);
+        rawData.read(reinterpret_cast<char*>(&tmp16), 2);
+        tmp16 = _byteswap_ushort(tmp16);
+        sentinelOneParam.SequenceFlags = (tmp16 >> 14);
+        sentinelOneParam.PacketSequenceCount = (tmp16 & 0x3f);
 
-        rawData.read(reinterpret_cast<char*>(&c), 2);
-        DataLen = _byteswap_ushort(c) + 1;
-        printf("%04x: %x(3)\tCount=%02d\tLen=%d(61..65533)\n", c, Sequence, Count, DataLen);
-        
+        rawData.read(reinterpret_cast<char*>(&tmp16), 2);
+        sentinelOneParam.PacketDataLength = _byteswap_ushort(tmp16) + 1;
         if (((DataLen + 6) % 4) != 0) {
             printf("\nERROR: Length not multiple of 4\n");
         }
         
         // Coarse Time
-        rawData.read(reinterpret_cast<char*>(&Time), 4);
-        Time = _byteswap_ulong(Time);
-        printf("\tTime: %d", Time);               
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Time), 4);
+        sentinelOneParam.Time = _byteswap_ulong(sentinelOneParam.Time);
         
         // Fine Time   
-        tmp16 = *(uint16_t*)(tablo + 4); 
-        tmp16 = _byteswap_ushort(tmp16);
-        printf(":%d", tmp16);                     
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.FineTime), 2);
+        sentinelOneParam.FineTime = _byteswap_ushort(sentinelOneParam.FineTime);
         
         // Sync Marker 
-        tmp32 = *(uint32_t*)(tablo + 6); 
-        tmp32 = _byteswap_ulong(tmp32);
-        printf("\t%08x(352EF853)", tmp32);       
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SyncMarker), 4);
+        sentinelOneParam.SyncMarker = _byteswap_ulong(sentinelOneParam.SyncMarker);
         
-        if (tmp32 != 0x352EF853) printf("\nERROR: Sync marker != 352EF853");
+        if (sentinelOneParam.SyncMarker != 0x352EF853) 
+            printf("\nERROR: Sync marker != 352EF853");
         
         tmp32 = *(uint32_t*)(tablo + 10); 
         tmp32 = _byteswap_ulong(tmp32);

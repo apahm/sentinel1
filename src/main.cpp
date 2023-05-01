@@ -1,4 +1,4 @@
-#include <vector>
+﻿#include <vector>
 #include <iostream>
 #include "ipp.h"
 #include <complex>
@@ -151,18 +151,8 @@ void  NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR) {
     }
 }
 
-/*
-1. The reference replica, Rep(t), is calculated from the amplitude and phase
-coefficients that are derived from the extracted chirp replica or from the
-nominal chirp.
-2. Rep(t) is zero padded to length Nfft and transformed 
-to the frequency domain using an FFT of this size, resulting in R(f) of size Nfft.
-3.
-
-*/
-
 template<typename T>
-T RangeReferenceFunction(T  TXPL, T TXPSF, T TXPRR) {
+T getRangeReferenceFunction(T  TXPL, T TXPSF, T TXPRR) {
     return static_cast <typeid(T).name()>(0);
 }
 
@@ -214,159 +204,136 @@ struct Sentinel1RawPacket {
 };
 
 int ReadSARParam(std::filesystem::path pathToRawData) {
-    int f, res; 
-    uint16_t tmp16, NQ = 0;
-    uint32_t tmp32, Time;
-    int Secondary;
-    int Count, DataLen, PID, PCAT, Sequence;
-    unsigned char tablo[65536], BAQ, Swath, Typ;
-    int cal_p, cposition, brcpos;
-    unsigned char* user;
-    float IE[52378]; // results
-    float IO[52378];
-    float QE[52378];
-    float QO[52378];
-    char brc[52378];
+    uint8_t tmp8 = 0;
+    uint16_t tmp16 = 0;
+    uint32_t tmp32 = 0;
     
-    int result;
-    int numline = 0;
     std::ifstream rawData(pathToRawData);
     if (!rawData.is_open()) {
         return -1;
     }
+
     Sentinel1RawPacket sentinelOneParam;
 
-    do {
+    while (!rawData.eof()) {
         rawData.read(reinterpret_cast<char*>(&tmp16), 2);
         tmp16 = _byteswap_ushort(tmp16);
-        sentinelOneParam.PacketVersionNumber = ;
-        sentinelOneParam.PacketType = ;
+        sentinelOneParam.PacketVersionNumber = tmp16 & 0x7;
+        sentinelOneParam.PacketType = tmp16 & 0x8;
         sentinelOneParam.SecondaryHeaderFlag = (tmp16 >> 11) & 0x01;
-        sentinelOneParam.ProcessID = (tmp16 >> 4) & 0x7f;
-        sentinelOneParam.PacketCategory = (tmp16) & 0xf;
+        sentinelOneParam.ProcessID = (tmp16 >> 4) & 0x7F;
+        sentinelOneParam.PacketCategory = (tmp16) & 0xF;
 
         rawData.read(reinterpret_cast<char*>(&tmp16), 2);
         tmp16 = _byteswap_ushort(tmp16);
         sentinelOneParam.SequenceFlags = (tmp16 >> 14);
-        sentinelOneParam.PacketSequenceCount = (tmp16 & 0x3f);
+        sentinelOneParam.PacketSequenceCount = (tmp16 & 0x3FF);
 
-        rawData.read(reinterpret_cast<char*>(&tmp16), 2);
-        sentinelOneParam.PacketDataLength = _byteswap_ushort(tmp16) + 1;
-        if (((DataLen + 6) % 4) != 0) {
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PacketDataLength), sizeof(sentinelOneParam.PacketDataLength));
+        sentinelOneParam.PacketDataLength = _byteswap_ushort(sentinelOneParam.PacketDataLength) + 1;
+        if (((sentinelOneParam.PacketDataLength + 6) % 4) != 0) {
             printf("\nERROR: Length not multiple of 4\n");
         }
         
-        // Coarse Time
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Time), 4);
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Time), sizeof(sentinelOneParam.Time));
         sentinelOneParam.Time = _byteswap_ulong(sentinelOneParam.Time);
         
-        // Fine Time   
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.FineTime), 2);
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.FineTime), sizeof(sentinelOneParam.FineTime));
         sentinelOneParam.FineTime = _byteswap_ushort(sentinelOneParam.FineTime);
         
-        // Sync Marker 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SyncMarker), 4);
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SyncMarker), sizeof(sentinelOneParam.SyncMarker));
         sentinelOneParam.SyncMarker = _byteswap_ulong(sentinelOneParam.SyncMarker);
         
-        if (sentinelOneParam.SyncMarker != 0x352EF853) 
-            printf("\nERROR: Sync marker != 352EF853");
-        
-        tmp32 = *(uint32_t*)(tablo + 10); 
-        tmp32 = _byteswap_ulong(tmp32);
-        //printf(" %08x",tmp32);                 // Data Take ID= begin+16 (TBD)
-        //printf("\t%hhx",*(uint8_t*)tablo+14); // ECC Number  = begin+20  ?! /!\ ?!
-        //printf("\t%hhx",*(uint8_t*)tablo+15); // TestMode/RXID=begin+21
-        tmp32 = *(uint32_t*)(tablo + 16); 
-        tmp32 = _byteswap_ulong(tmp32);
-        //printf("\t%08x",tmp32);                  // Config ID   = begin+22 (TBD)
-        // page 22
-
-        // Sub-commutation ancillary data: PVT/attitude will be accumulated as 42 words along headers
-        // p.27: Counter+value                    (3 bytes)
-        printf("\tWordIndex=%hhx", *(uint8_t*)(tablo + 20)); // Word index will increment from 1 to 0x40 to fill
-        tmp16 = *(uint16_t*)(tablo + 21); 
-        tmp16 = _byteswap_ushort(tmp16);  // the array described in p.23 with ... vvv
-        printf("\tWordVal=%hx", tmp16);                   // Word value
-
-        // Space packet count (4 bytes)
-        tmp32 = *(uint32_t*)(tablo + 23); 
-        tmp32 = _byteswap_ulong(tmp32);
-        printf("\t%08x", tmp32);                  
-        
-        // PRI count (4 bytes)
-        tmp32 = *(uint32_t*)(tablo + 27); 
-        tmp32 = _byteswap_ulong(tmp32);
-        printf(" %08x", tmp32);                   
-        
-        // BAQ mode 0x0c=FDBAQ mode0 nominal p.33: 
-        BAQ = (*(uint8_t*)(tablo + 31)) & 0x1f;       
-        printf(" BAQ=%02x(c)", (*(uint8_t*)(tablo + 31)));
-        // p.32: RADAR Configuration Support     (28 bytes) -> total=31+28=59
-        printf(" BlockLen=%hhx(1F)\n", (*(uint8_t*)(tablo + 32)));
-
-        printf("\tDecim=%hhx", *(uint8_t*)(tablo + 34));     // RGDEC
-        tmp16 = *(uint16_t*)(tablo + 36); 
-        tmp16 = _byteswap_ushort(tmp16);  // Tx Pulse Ramp Rate
-        if ((tmp16 & 0x8000) == 0) 
-            printf("\tTXPRR=v%x=", tmp16); 
-        else 
-            printf("\tTXPRR=^%x=", tmp16);
-        printf("%d", tmp16 & 0x7fff);
-        tmp16 = *(uint16_t*)(tablo + 38); 
-        tmp16 = _byteswap_ushort(tmp16);  // Tx Pulse Start Freq
-        if ((tmp16 & 0x8000) == 0) 
-            printf("\tTXPSF=-0x%x", tmp16); 
-        else 
-            printf("\tTXPSF=+0x%x", tmp16); // 0 negative, 1 positive ?!
-        printf("=%d ", tmp16 & 0x7fff);             // Word value
-        tmp32 = *(uint32_t*)(tablo + 40); 
-        tmp32 = ntohl(tmp32) >> 8; // keep last 24 bits
-        printf("TXPL=%08x=%d ", tmp32, tmp32);     // TX Pulse length (3 bytes)
-        tmp32 = *(uint32_t*)(tablo + 44); 
-        tmp32 = ntohl(tmp32) >> 8; // keep last 24 bits
-        printf("PRI=%08x=%d", tmp32, tmp32);       // PRI, needed for Doppler centroid analysis (3 bytes)
-
-        cal_p = ((*(uint8_t*)(tablo + 53)) >> 4) & 0x07;
-        printf(" Polar=%x", cal_p);              // SSB Data calibration (p.47) 
-        Typ = (*(uint8_t*)(tablo + 57)); Typ = Typ >> 4; // p.52: signal type
-        printf(" Typ=%hhx(0)", Typ);
-        Swath = (*(uint8_t*)(tablo + 58));          // p.54: swath number
-        printf(" Swath=%hhx", Swath);
-        // p.54 RADAR Sample Count (2 bytes)
-        NQ = *(uint16_t*)(tablo + 59); 
-        NQ = _byteswap_ushort(NQ); // number of quads NQ => Nsamples=2xNQ 
-        printf(" NQ=%d\n", NQ);
-        // if (NQ==0) fprintf(result,"%d\n",2*NQ);
-        // tablo+61 = n/a (p.54: index 67)
-
-        // p.56 User Data Field -- DataLen-62 ; 4 sections with IE, IO, QE, QO (NOT interleaved)
-        user = (uint8_t*)(tablo + 62);  // User Data Field starts @ end of Secondary Header
-        // p.58: format D is nominally used to output radar echo data = Decimation + FDBAQ
-        // NO BYTESWAP SINCE WE WORK BIT BY BIT: Keep bytes in read() order
-        // calibration (p.52: Typ>7 for cal, and p.33: BAQMOD=0=BYPASS for cal)
-        if ((BAQ == 0x00) && (Typ > 7)) {
-
-            cposition = bypass(user, NQ, IE, IO, QE, QO);
-
-            printf(", finished processing %d calibration\n", DataLen - 62);
-
-            if ((DataLen - 62 - cposition) > 2) {
-                printf("Not enough data processed: DataLen %d v.s. cposition %d\n", DataLen - 62, cposition); exit(-1);
-            }
+        if (sentinelOneParam.SyncMarker != 0x352EF853) {
+            std::cerr << "ERROR: Sync marker != 352EF853" << std::endl;
         }
-        // echo data (p.52: Typ=0 for echo data and p.33 BAQ Mode=0x0C => nominal FDBAQ p.67)
-        if ((BAQ == 0x0c) && (Typ == 0)) {
-            brcpos = 0;
-            cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
+        
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.DataTakeID), sizeof(sentinelOneParam.DataTakeID));
 
-            printf(", finished processing %d echo\n", DataLen - 62);
-            if ((DataLen - 62 - cposition) > 2) { 
-                printf("Not enough data processed: DataLen %d v.s. cposition %d\n", DataLen - 62, cposition); 
-                exit(-1); 
-            }
+        rawData.read(reinterpret_cast<char*>(&tmp8), 1);
+        sentinelOneParam.ECCNumber = tmp8;
+
+        rawData.read(reinterpret_cast<char*>(&tmp8), 1);
+        sentinelOneParam.TestMode = tmp8;
+        sentinelOneParam.RxChannelId = tmp8;
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.InstrumentConfigID), sizeof(sentinelOneParam.InstrumentConfigID));
+        sentinelOneParam.InstrumentConfigID = _byteswap_ulong(sentinelOneParam.InstrumentConfigID);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.WordIndex), sizeof(sentinelOneParam.WordIndex));
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.WordVal), sizeof(sentinelOneParam.WordVal));
+        sentinelOneParam.WordVal = _byteswap_ushort(sentinelOneParam.WordVal);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SpacePacketCount), sizeof(sentinelOneParam.SpacePacketCount));
+        sentinelOneParam.SpacePacketCount = _byteswap_ulong(sentinelOneParam.SpacePacketCount);
+        
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PRICount), sizeof(sentinelOneParam.PRICount));
+        sentinelOneParam.PRICount = _byteswap_ulong(sentinelOneParam.PRICount);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PRICount), sizeof(sentinelOneParam.PRICount));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.BAQMode), sizeof(sentinelOneParam.BAQMode));
+        sentinelOneParam.BAQMode = sentinelOneParam.BAQMode & 0x1f;
+        
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.ErrorFlag), sizeof(sentinelOneParam.ErrorFlag));
+        
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.BAQBlockLength), sizeof(sentinelOneParam.BAQBlockLength));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.RangeDecimation), sizeof(sentinelOneParam.RangeDecimation));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.RxGain), sizeof(sentinelOneParam.RxGain));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxRampRate), sizeof(sentinelOneParam.TxRampRate));
+        sentinelOneParam.TxRampRate = _byteswap_ushort(sentinelOneParam.TxRampRate);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseStartFreq), sizeof(sentinelOneParam.TxPulseStartFreq));
+        sentinelOneParam.TxPulseStartFreq = _byteswap_ushort(sentinelOneParam.TxPulseStartFreq);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseLength), sizeof(sentinelOneParam.TxPulseLength));
+        sentinelOneParam.TxPulseLength = _byteswap_ulong(sentinelOneParam.TxPulseLength);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Rank), sizeof(sentinelOneParam.Rank));
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PulseRepetitionInterval), sizeof(sentinelOneParam.PulseRepetitionInterval));
+        sentinelOneParam.PulseRepetitionInterval = _byteswap_ulong(sentinelOneParam.PulseRepetitionInterval);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SamplingWindowStartTime), sizeof(sentinelOneParam.SamplingWindowStartTime));
+        sentinelOneParam.SamplingWindowStartTime = _byteswap_ulong(sentinelOneParam.SamplingWindowStartTime);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SamplingWindowLength), sizeof(sentinelOneParam.SamplingWindowLength));
+        sentinelOneParam.SamplingWindowLength = _byteswap_ulong(sentinelOneParam.SamplingWindowLength);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Polarisation), sizeof(sentinelOneParam.Polarisation));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TemperatureCompensation), sizeof(sentinelOneParam.TemperatureCompensation));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.ElevationBeamAddress), sizeof(sentinelOneParam.ElevationBeamAddress));
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.AzimuthBeamAddress), sizeof(sentinelOneParam.AzimuthBeamAddress));
+        sentinelOneParam.AzimuthBeamAddress = _byteswap_ushort(sentinelOneParam.AzimuthBeamAddress);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SASTestMode), sizeof(sentinelOneParam.SASTestMode));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalType), sizeof(sentinelOneParam.CalType));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalibrationBeamAddress), sizeof(sentinelOneParam.CalibrationBeamAddress));
+        sentinelOneParam.CalibrationBeamAddress = _byteswap_ushort(sentinelOneParam.CalibrationBeamAddress);
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalMode), sizeof(sentinelOneParam.CalMode));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseNumber), sizeof(sentinelOneParam.TxPulseNumber));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SignalType), sizeof(sentinelOneParam.SignalType));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SwapFlag), sizeof(sentinelOneParam.SwapFlag));
+
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SwathNumber), sizeof(sentinelOneParam.SwathNumber));
+
+        if ((sentinelOneParam.BAQMode == 0x00) && (sentinelOneParam.CalType > 7)) {
+            //cposition = bypass(user, NQ, IE, IO, QE, QO);
         }
-        numline++;
-    } while ((res > 0)); // until EOF
+        if ((sentinelOneParam.BAQMode == 0x0c) && (sentinelOneParam.CalType == 0)) {
+            //cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
+        }
+    }; 
 }
 
 int next_bit(unsigned char* p, int* cposition, int* bposition)
@@ -377,7 +344,23 @@ int next_bit(unsigned char* p, int* cposition, int* bposition)
     return(bit);
 }
 
-static struct sh_code BRC4(unsigned char* p, int* cposition, int* bposition) // TODO: never tested !
+unsigned char get_THIDX(unsigned char* p, int* cposition, int* bposition)
+{
+    int res = 0;
+    int k;
+    for (k = 0; k < 8; k++) {
+        res = res << 1;
+        res += next_bit(p, cposition, bposition);
+    }
+    return(res);
+}
+
+struct sh_code { 
+    int sign; 
+    int mcode; 
+};
+
+static struct sh_code BRC4Func(unsigned char* p, int* cposition, int* bposition) // TODO: never tested !
 {
     int hcode, sign;
     struct sh_code sol;
@@ -464,13 +447,27 @@ static struct sh_code BRC(int BRCn, unsigned char* p, int* cposition, int* bposi
     int sign;
     int b;
     struct sh_code sol;
+
     switch (BRCn) {
-    case 0: BRCn = 3; break; // number of steps to reach the leaves BRC0
-    case 1: BRCn = 4; break; // number of steps to reach the leaves BRC1
-    case 2: BRCn = 6; break; // number of steps to reach the leaves BRC2
-    case 3: BRCn = 9; break; // number of steps to reach the leaves BRC3
-    case 4: return(BRC4(p, cposition, bposition)); printf("\nCheck if BRC4 output is correct\n"); exit(0); break;
-    default: printf("ERROR"); exit(-1);
+        case 0: 
+            BRCn = 3; 
+            break; // number of steps to reach the leaves BRC0
+        case 1: 
+            BRCn = 4; 
+            break; // number of steps to reach the leaves BRC1
+        case 2: 
+            BRCn = 6; 
+            break; // number of steps to reach the leaves BRC2
+        case 3: 
+            BRCn = 9; 
+            break; // number of steps to reach the leaves BRC3
+        case 4: 
+            return(BRC4Func(p, cposition, bposition));
+            printf("\nCheck if BRC4 output is correct\n"); 
+            exit(0); 
+            break;
+        default: 
+            printf("ERROR"); exit(-1);
     }
     sign = next_bit(p, cposition, bposition);
     if (sign == 0) sol.sign = 1; else sol.sign = -1;
@@ -509,120 +506,6 @@ static struct sh_code BRC(int BRCn, unsigned char* p, int* cposition, int* bposi
     return(sol);                                  // should never be reached
 }
 
-unsigned char get_THIDX(unsigned char* p, int* cposition, int* bposition)
-{
-    int res = 0;
-    int k;
-    for (k = 0; k < 8; k++)
-    {
-        res = res << 1;
-        res += next_bit(p, cposition, bposition);
-    }
-    return(res);
-}
-
-int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos) // FDBAQ: section 4.4 p.67
-{// IE 1st 3 bits = BRC
- // QE first 8 bits = THIDX
-    struct sh_code hcodeIE[52378];
-    struct sh_code hcodeIO[52378];
-    struct sh_code hcodeQE[52378];
-    struct sh_code hcodeQO[52378];
-    unsigned char BRCn[410];   // max value p.55: 52378/128=409.2
-    unsigned char THIDXn[410];
-    int BRCindex;
-    int h, hcode_index;
-    int cposition = 0, bposition = 7;
-    int inc = 128;  // 128 samples until NQ is reached
-    msg("\nstarting IE\n");
-    BRCindex = 0;
-    hcode_index = 0;
-    do // repeat until end of packet: depends on NQ
-    {//msg("\npos:%d:",bposition);
-        BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
-        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
-        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
-#ifdef dump_payload
-        msg("\n");
-#endif
-        msg("%d>", BRCn[BRCindex]);
-        brc[*brcpos] = BRCn[BRCindex];
-        (*brcpos)++;
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-#ifdef dump_payload
-            msg("%d", hcodeIE[hcode_index]);
-#endif
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    msg("\nIE finished, starting IO @ %d\n", cposition);
-    inc = 128;
-    if (bposition != 7) { msg("bposition=%d->7\n", bposition); bposition = 7; cposition++; } // start at new position
-    if ((cposition & 1) != 0) { msg("cposition=%d++\n", cposition); cposition++; }        // odd address => +1 
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeIO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-      //      msg("%d",hcodeIO[hcode_index]);
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    msg("IO finished, starting QE @ %d\n", cposition);
-    inc = 128;
-    if (bposition != 7) { msg("bposition=%d\n", bposition); bposition = 7; cposition++; } // start at new position
-    if ((cposition & 1) != 0) { msg("cposition=%d++\n", cposition); cposition++; }     // odd address => +1 
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        THIDXn[BRCindex] = get_THIDX(p, &cposition, &bposition);
-        //   THIDXn[BRCindex]=p[cposition]; // 8-bit THIDX
-        msg("#%d", THIDXn[BRCindex]);
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-      //      msg("%d",hcodeQE[hcode_index]);
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    msg("\nQE finished, starting QO @ %d\n", cposition);
-    inc = 128;
-    if (bposition != 7) { msg("bposition=%d\n", bposition); bposition = 7; cposition++; } // start at new position
-    if ((cposition & 1) != 0) { msg("cposition=%d++\n", cposition); cposition++; }     // odd address => +1 
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeQO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-      //      msg("%d",hcodeQO[hcode_index]);
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    if (bposition != 7) { msg("bposition=%d->7\n", bposition); bposition = 7; cposition++; } // start at new position
-    if ((cposition & 1) != 0) { msg("cposition=%d++\n", cposition); cposition++; }        // odd address => +1 
-    msg("finished at %d", cposition);
-    reconstruction(BRCn, THIDXn, hcodeIE, NQ, IE);
-    reconstruction(BRCn, THIDXn, hcodeIO, NQ, IO);
-    reconstruction(BRCn, THIDXn, hcodeQE, NQ, QE);
-    reconstruction(BRCn, THIDXn, hcodeQO, NQ, QO);
-    return(cposition);
-}
-
 // p.78
 float BRC0[4] = { 3.,3.,3.16,3.53 };
 float BRC1[4] = { 4.,4.,4.08,4.37 };
@@ -638,7 +521,28 @@ float NRL3[10] = { .1702,.5107,.8511,1.1916,1.5321,1.8726,2.2131,2.5536,2.8942,3
 float NRL4[16] = { .1130,.3389,.5649,.7908,1.0167,1.2428,1.4687,1.6947,1.9206,2.1466,2.3725,2.5985,2.8244,3.0504,3.2764,3.6623 };
 
 // p.80
-float SF[256] = { 0., 0.630, 1.250, 1.880, 2.510, 3.130, 3.760, 4.390, 5.010, 5.640, 6.270, 6.890, 7.520, 8.150, 8.770, 9.40, 10.030, 10.650, 11.280, 11.910, 12.530, 13.160, 13.790, 14.410, 15.040, 15.670, 16.290, 16.920, 17.550, 18.170, 18.80, 19.430, 20.050, 20.680, 21.310, 21.930, 22.560, 23.190, 23.810, 24.440, 25.070, 25.690, 26.320, 26.950, 27.570, 28.20, 28.830, 29.450, 30.080, 30.710, 31.330, 31.960, 32.590, 33.210, 33.840, 34.470, 35.090, 35.720, 36.350, 36.970, 37.60, 38.230, 38.850, 39.480, 40.110, 40.730, 41.360, 41.990, 42.610, 43.240, 43.870, 44.490, 45.120, 45.750, 46.370, 47., 47.630, 48.250, 48.880, 49.510, 50.130, 50.760, 51.390, 52.010, 52.640, 53.270, 53.890, 54.520, 55.150, 55.770, 56.40, 57.030, 57.650, 58.280, 58.910, 59.530, 60.160, 60.790, 61.410, 62.040, 62.980, 64.240, 65.490, 66.740, 68., 69.250, 70.50, 71.760, 73.010, 74.260, 75.520, 76.770, 78.020, 79.280, 80.530, 81.780, 83.040, 84.290, 85.540, 86.80, 88.050, 89.30, 90.560, 91.810, 93.060, 94.320, 95.570, 96.820, 98.080, 99.330, 100.580, 101.840, 103.090, 104.340, 105.60, 106.850, 108.10, 109.350, 110.610, 111.860, 113.110, 114.370, 115.620, 116.870, 118.130, 119.380, 120.630, 121.890, 123.140, 124.390, 125.650, 126.90, 128.150, 129.410, 130.660, 131.910, 133.170, 134.420, 135.670, 136.930, 138.180, 139.430, 140.690, 141.940, 143.190, 144.450, 145.70, 146.950, 148.210, 149.460, 150.710, 151.970, 153.220, 154.470, 155.730, 156.980, 158.230, 159.490, 160.740, 161.990, 163.250, 164.50, 165.750, 167.010, 168.260, 169.510, 170.770, 172.020, 173.270, 174.530, 175.780, 177.030, 178.290, 179.540, 180.790, 182.050, 183.30, 184.550, 185.810, 187.060, 188.310, 189.570, 190.820, 192.070, 193.330, 194.580, 195.830, 197.090, 198.340, 199.590, 200.850, 202.10, 203.350, 204.610, 205.860, 207.110, 208.370, 209.620, 210.870, 212.130, 213.380, 214.630, 215.890, 217.140, 218.390, 219.650, 220.90, 222.150, 223.410, 224.660, 225.910, 227.170, 228.420, 229.670, 230.930, 232.180, 233.430, 234.690, 235.940, 237.190, 238.450, 239.70, 240.950, 242.210, 243.460, 244.710, 245.970, 247.220, 248.470, 249.730, 250.980, 252.230, 253.490, 254.740, 255.990, 255.990 };
+float SF[256] = { 0., 0.630, 1.250, 1.880, 2.510, 3.130, 3.760, 4.390, 5.010, 5.640, 6.270, 6.890, 7.520,
+            8.150, 8.770, 9.40, 10.030, 10.650, 11.280, 11.910, 12.530, 13.160, 13.790, 14.410, 15.040,
+            15.670, 16.290, 16.920, 17.550, 18.170, 18.80, 19.430, 20.050, 20.680, 21.310, 21.930, 22.560,
+            23.190, 23.810, 24.440, 25.070, 25.690, 26.320, 26.950, 27.570, 28.20, 28.830, 29.450, 30.080,
+            30.710, 31.330, 31.960, 32.590, 33.210, 33.840, 34.470, 35.090, 35.720, 36.350, 36.970, 37.60,
+            38.230, 38.850, 39.480, 40.110, 40.730, 41.360, 41.990, 42.610, 43.240, 43.870, 44.490, 45.120,
+            45.750, 46.370, 47., 47.630, 48.250, 48.880, 49.510, 50.130, 50.760, 51.390, 52.010, 52.640,
+            53.270, 53.890, 54.520, 55.150, 55.770, 56.40, 57.030, 57.650, 58.280, 58.910, 59.530, 60.160,
+            60.790, 61.410, 62.040, 62.980, 64.240, 65.490, 66.740, 68., 69.250, 70.50, 71.760, 73.010,
+            74.260, 75.520, 76.770, 78.020, 79.280, 80.530, 81.780, 83.040, 84.290, 85.540, 86.80, 88.050,
+            89.30, 90.560, 91.810, 93.060, 94.320, 95.570, 96.820, 98.080, 99.330, 100.580, 101.840, 103.090,
+            104.340, 105.60, 106.850, 108.10, 109.350, 110.610, 111.860, 113.110, 114.370, 115.620, 116.870,
+            118.130, 119.380, 120.630, 121.890, 123.140, 124.390, 125.650, 126.90, 128.150, 129.410, 130.660,
+            131.910, 133.170, 134.420, 135.670, 136.930, 138.180,139.430, 140.690, 141.940, 143.190, 144.450,
+            145.70, 146.950, 148.210, 149.460, 150.710, 151.970, 153.220, 154.470, 155.730, 156.980, 158.230,
+            159.490, 160.740, 161.990, 163.250, 164.50, 165.750, 167.010, 168.260, 169.510, 170.770, 172.020,
+            173.270, 174.530, 175.780, 177.030, 178.290, 179.540, 180.790, 182.050, 183.30, 184.550, 185.810,
+            187.060, 188.310, 189.570, 190.820, 192.070, 193.330, 194.580, 195.830, 197.090, 198.340, 199.590,
+            200.850, 202.10, 203.350, 204.610, 205.860, 207.110, 208.370, 209.620, 210.870, 212.130, 213.380,
+            214.630, 215.890, 217.140, 218.390, 219.650, 220.90, 222.150, 223.410, 224.660, 225.910, 227.170,
+            228.420, 229.670, 230.930, 232.180, 233.430, 234.690, 235.940, 237.190, 238.450, 239.70, 240.950,
+            242.210, 243.460, 244.710, 245.970, 247.220, 248.470, 249.730, 250.980, 252.230, 253.490, 254.740, 255.990, 255.990 };
 
 void reconstruction(unsigned char* BRCn, unsigned char* THIDXn, struct sh_code* hcode, int NQ, float* result)
 {
@@ -647,8 +551,8 @@ void reconstruction(unsigned char* BRCn, unsigned char* THIDXn, struct sh_code* 
     int inc = 128;
     do
     {
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);
+        for (h = 0; h < inc; h++)
         {
             switch (BRCn[BRCindex])
             {
@@ -710,154 +614,110 @@ void reconstruction(unsigned char* BRCn, unsigned char* THIDXn, struct sh_code* 
     } while (hcode_index < NQ);
 }
 
-int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) // bypass
-{
-    int NW = (10 * NQ) / 16 * 2;
-    short res;
-    int pos = 0, sign, index = 0;
-    printf("\nNQ=%d -> NW=%d\n", NQ, NW);
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
+int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos) // FDBAQ: section 4.4 p.67
+{   
+    sh_code hcodeIE[52378];
+    sh_code hcodeIO[52378];
+    sh_code hcodeQE[52378];
+    sh_code hcodeQO[52378];
+    unsigned char BRCn[410];   // max value p.55: 52378/128=409.2
+    unsigned char THIDXn[410];
+    int BRCindex;
+    int h, hcode_index;
+    int cposition = 0, bposition = 7;
+    int inc = 128;  // 128 samples until NQ is reached
+    
+    BRCindex = 0;
+    hcode_index = 0;
+    do // repeat until end of packet: depends on NQ
+    {//msg("\npos:%d:",bposition);
+        BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
+        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
+        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
+        brc[*brcpos] = BRCn[BRCindex];
+        (*brcpos)++;
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
         {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
+            hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+            hcode_index++;
         }
-        if (index < NQ)
+        BRCindex++;
+    } while (hcode_index < NQ);
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }        // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
         {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
+            hcodeIO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+            hcode_index++;
         }
-        if (index < NQ)
+        BRCindex++;
+    } while (hcode_index < NQ);
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }     // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        THIDXn[BRCindex] = get_THIDX(p, &cposition, &bposition);
+        //   THIDXn[BRCindex]=p[cposition]; // 8-bit THIDX
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
         {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
+            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+      //      msg("%d",hcodeQE[hcode_index]);
+            hcode_index++;
         }
-        if (index < NQ)
+        BRCindex++;
+    } while (hcode_index < NQ);
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }     // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
         {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
+            hcodeQO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+      //      msg("%d",hcodeQO[hcode_index]);
+            hcode_index++;
         }
-        if (index < NQ) pos += 5;
-    }
-    index = 0;
-    pos = NW + 2; // next short
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    printf("\npos=%d index=%d nw=%d\n", pos, index, (2 * NW + 2));
-    index = 0;
-    pos = 2 * (NW + 2); // next short
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    index = 0;
-    pos = 3 * (NW + 2); // next short
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    printf("\npos=%d index=%d\n", pos, index);
-    pos = 4 * (NW + 2); // next short
-    return(pos);
-}
-
-int main(int argc, char *argv[])
-{
-
-    return 0;
+        BRCindex++;
+    } while (hcode_index < NQ);
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }        // odd address => +1 
+    reconstruction(BRCn, THIDXn, hcodeIE, NQ, IE);
+    reconstruction(BRCn, THIDXn, hcodeIO, NQ, IO);
+    reconstruction(BRCn, THIDXn, hcodeQE, NQ, QE);
+    reconstruction(BRCn, THIDXn, hcodeQO, NQ, QO);
+    return(cposition);
 }

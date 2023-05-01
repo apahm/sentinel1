@@ -340,7 +340,10 @@ int next_bit(unsigned char* p, int* cposition, int* bposition)
 {
     int bit = ((p[*cposition] >> (*bposition)) & 1);
     (*bposition)--;
-    if ((*bposition) < 0) { (*cposition)++; (*bposition) = 7; }
+    if ((*bposition) < 0) { 
+        (*cposition)++; 
+        (*bposition) = 7; 
+    }
     return(bit);
 }
 

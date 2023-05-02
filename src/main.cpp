@@ -166,7 +166,7 @@ struct Sentinel1RawPacket {
     uint16_t PacketSequenceCount;
     uint16_t PacketDataLength;
     uint32_t Time;
-    uint16_t FineTime;
+    uint32_t FineTime;
     uint32_t SyncMarker;
     uint32_t DataTakeID;
     uint8_t ECCNumber;
@@ -181,7 +181,7 @@ struct Sentinel1RawPacket {
     bool ErrorFlag;
     uint8_t BAQBlockLength;
     uint8_t RangeDecimation;
-    uint8_t RxGain;
+    uint32_t RxGain;
     uint16_t TxRampRate;
     uint16_t TxPulseStartFreq;
     uint32_t TxPulseLength;
@@ -201,6 +201,121 @@ struct Sentinel1RawPacket {
     uint8_t SignalType;
     bool SwapFlag;
     uint8_t SwathNumber;
+};
+
+enum TestMode {
+    Default = 0,
+    GroundTestingOnlyModeOne = 0x4,
+    GroundTestingOnlyModeTwo = 0x5,
+    Oper = 0x6,
+    Bypass = 0x7
+};
+
+enum BAQMode {
+    BypassMode = 0,
+    BAQ3BitMode = 3,
+    BAQ4BitMode = 4,
+    BAQ5BitMode = 5,
+    FDBAQMode0 = 12,
+    FDBAQMode1 = 13,
+    FDBAQMode2 = 14
+};
+
+enum RangeDecimation {
+    Filter0,
+    Filter1,
+    Filter2,
+    Filter3,
+    Filter4,
+    Filter5,
+    Filter6,
+    Filter7,
+    Filter8,
+    Filter9,
+    Filter10,
+    Filter11
+};
+
+enum TemperatureCompensation {
+    TemperatureCompensationAntennaFE_OFF_TA_OFF,
+    TemperatureCompensationAntennaFE_ON_TA_OFF,
+    TemperatureCompensationAntennaFE_OFF_TA_ON,
+    TemperatureCompensationAntennaFE_ON_TA_ON
+};
+
+enum Polarisation {
+    TxHorizontalOnly,
+    TxHRxH,
+    TxHRxV,
+    TxHRxVRxH,
+    TxVerticalalOnly,
+    TxVRxH,
+    TxVRxV,
+    TxVRxVRxH,
+};
+
+enum CalType {
+    TxCal = 0,
+    RxCal = 1,
+    EPDNCal = 2,
+    TACal = 3,
+    APDNCal = 4,
+    TxHcalIso = 7
+};
+
+enum SignalType {
+    Echo = 0,
+    Noise = 1,
+    TxCal = 8,
+    RxCal = 9,
+    EPDNCal = 10,
+    TACal = 11,
+    APDNCal = 12,
+    TxHcalIso = 15
+};
+
+enum ECCNumber {
+    Stripmap1 = 1,
+    Stripmap2 = 2,
+    Stripmap3 = 3,
+    Stripmap4 = 4,
+    Stripmap5 = 5,
+    Stripmap6 = 6,
+    InterferometricWideSwath = 8,
+    WaveMode = 9,
+    Stripmap5S = 10,
+    Stripmap1WithoutInterlCal = 11,
+    Stripmap2WithoutInterlCal = 12,
+    Stripmap3WithoutInterlCal = 13,
+    Stripmap4WithoutInterlCal = 14,
+    RFCmode = 15,
+    TestModeOperBypass = 16,
+    ElevationNotchS3 = 17,
+    AzimuthNotchS1 = 19,
+    AzimuthNotchS2 = 20,
+    AzimuthNotchS3 = 21,
+    AzimuthNotchS4 = 22,
+    AzimuthNotchS5N = 23,
+    AzimuthNotchS5S = 24,
+    AzimuthNotchS6 = 25,
+    Stripmap5NWithoutInterlCal = 26,
+    Stripmap5SWithoutInterlCal = 27,
+    Stripmap6WithoutInterlCal = 28,
+    ElevationNotchS3WithoutInterlCal = 31,
+    ExtraWideSwath = 32,
+    AzimuthNotchS1WithoutInterlCal = 33,
+    AzimuthNotchS3WithoutInterlCal = 34,
+    AzimuthNotchS6WithoutInterlCal = 35,
+    NoiseCharacterisationS1 = 37,
+    NoiseCharacterisationS2 = 38,
+    NoiseCharacterisationS3 = 39,
+    NoiseCharacterisationS4 = 40,
+    NoiseCharacterisationS5N = 41,
+    NoiseCharacterisationS5S = 42,
+    NoiseCharacterisationS6 = 43,
+    NoiseCharacterisationEWS = 44,
+    NoiseCharacterisationIWS = 45,
+    NoiseCharacterisationWave = 46
 };
 
 int ReadSARParam(std::filesystem::path pathToRawData) {

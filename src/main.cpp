@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <intrin.h>
+#include <bitset>
 
 template<typename T>
 struct Point {
@@ -143,7 +144,7 @@ int rangeCompression(ComplexMatrix &rawData, bool calcIfft = true) {
 }
 
 template<typename T>
-void  NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR) {
+void NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR) {
     std::vector<std::complex<float>> refFunc;
     
     for (size_t i = 0; i < length; i++) {
@@ -156,125 +157,7 @@ T getRangeReferenceFunction(T  TXPL, T TXPSF, T TXPRR) {
     return static_cast <typeid(T).name()>(0);
 }
 
-struct Sentinel1RawPacket {
-    uint8_t PacketVersionNumber;
-    uint8_t PacketType;
-    uint8_t SecondaryHeaderFlag;
-    uint8_t ProcessID;
-    uint8_t PacketCategory;
-    uint8_t SequenceFlags;
-    uint16_t PacketSequenceCount;
-    uint16_t PacketDataLength;
-    uint32_t Time;
-    uint32_t FineTime;
-    uint32_t SyncMarker;
-    uint32_t DataTakeID;
-    uint8_t ECCNumber;
-    uint8_t TestMode;
-    bool RxChannelId;
-    uint32_t InstrumentConfigID;
-    uint8_t WordIndex;
-    uint16_t WordVal;
-    uint32_t SpacePacketCount;
-    uint32_t PRICount;
-    uint8_t BAQMode;
-    bool ErrorFlag;
-    uint8_t BAQBlockLength;
-    uint8_t RangeDecimation;
-    uint32_t RxGain;
-    uint16_t TxRampRate;
-    uint16_t TxPulseStartFreq;
-    uint32_t TxPulseLength;
-    uint8_t Rank;
-    uint32_t PulseRepetitionInterval;
-    uint32_t SamplingWindowStartTime;
-    uint32_t SamplingWindowLength;
-    uint8_t Polarisation;
-    uint8_t TemperatureCompensation;
-    uint8_t ElevationBeamAddress;
-    uint16_t AzimuthBeamAddress;
-    bool SASTestMode;
-    uint8_t CalType;
-    uint16_t CalibrationBeamAddress;
-    uint8_t CalMode;
-    uint8_t TxPulseNumber;
-    uint8_t SignalType;
-    bool SwapFlag;
-    uint8_t SwathNumber;
-};
-
-enum TestMode {
-    Default = 0,
-    GroundTestingOnlyModeOne = 0x4,
-    GroundTestingOnlyModeTwo = 0x5,
-    Oper = 0x6,
-    Bypass = 0x7
-};
-
-enum BAQMode {
-    BypassMode = 0,
-    BAQ3BitMode = 3,
-    BAQ4BitMode = 4,
-    BAQ5BitMode = 5,
-    FDBAQMode0 = 12,
-    FDBAQMode1 = 13,
-    FDBAQMode2 = 14
-};
-
-enum RangeDecimation {
-    Filter0,
-    Filter1,
-    Filter2,
-    Filter3,
-    Filter4,
-    Filter5,
-    Filter6,
-    Filter7,
-    Filter8,
-    Filter9,
-    Filter10,
-    Filter11
-};
-
-enum TemperatureCompensation {
-    TemperatureCompensationAntennaFE_OFF_TA_OFF,
-    TemperatureCompensationAntennaFE_ON_TA_OFF,
-    TemperatureCompensationAntennaFE_OFF_TA_ON,
-    TemperatureCompensationAntennaFE_ON_TA_ON
-};
-
-enum Polarisation {
-    TxHorizontalOnly,
-    TxHRxH,
-    TxHRxV,
-    TxHRxVRxH,
-    TxVerticalalOnly,
-    TxVRxH,
-    TxVRxV,
-    TxVRxVRxH,
-};
-
-enum CalType {
-    TxCal = 0,
-    RxCal = 1,
-    EPDNCal = 2,
-    TACal = 3,
-    APDNCal = 4,
-    TxHcalIso = 7
-};
-
-enum SignalType {
-    Echo = 0,
-    Noise = 1,
-    TxCal = 8,
-    RxCal = 9,
-    EPDNCal = 10,
-    TACal = 11,
-    APDNCal = 12,
-    TxHcalIso = 15
-};
-
-enum ECCNumber {
+enum class ECCNumber {
     Stripmap1 = 1,
     Stripmap2 = 2,
     Stripmap3 = 3,
@@ -318,6 +201,187 @@ enum ECCNumber {
     NoiseCharacterisationWave = 46
 };
 
+enum class TestMode {
+    Default = 0,
+    GroundTestingOnlyModeOne = 0x4,
+    GroundTestingOnlyModeTwo = 0x5,
+    Oper = 0x6,
+    Bypass = 0x7
+};
+
+enum class BAQMode {
+    BypassMode = 0,
+    BAQ3BitMode = 3,
+    BAQ4BitMode = 4,
+    BAQ5BitMode = 5,
+    FDBAQMode0 = 12,
+    FDBAQMode1 = 13,
+    FDBAQMode2 = 14
+};
+
+enum class RangeDecimation {
+    Filter0,
+    Filter1,
+    Filter2,
+    Filter3,
+    Filter4,
+    Filter5,
+    Filter6,
+    Filter7,
+    Filter8,
+    Filter9,
+    Filter10,
+    Filter11
+};
+
+enum class TemperatureCompensation {
+    TemperatureCompensationAntennaFE_OFF_TA_OFF,
+    TemperatureCompensationAntennaFE_ON_TA_OFF,
+    TemperatureCompensationAntennaFE_OFF_TA_ON,
+    TemperatureCompensationAntennaFE_ON_TA_ON
+};
+
+enum class Polarisation {
+    TxHorizontalOnly,
+    TxHRxH,
+    TxHRxV,
+    TxHRxVRxH,
+    TxVerticalalOnly,
+    TxVRxH,
+    TxVRxV,
+    TxVRxVRxH,
+};
+
+enum class CalType {
+    TxCal = 0,
+    RxCal = 1,
+    EPDNCal = 2,
+    TACal = 3,
+    APDNCal = 4,
+    TxHcalIso = 7
+};
+
+enum class SignalType {
+    Echo = 0,
+    Noise = 1,
+    TxCal = 8,
+    RxCal = 9,
+    EPDNCal = 10,
+    TACal = 11,
+    APDNCal = 12,
+    TxHcalIso = 15
+};
+
+struct Sentinel1RawPacket {
+    uint8_t PacketVersionNumber;
+    uint8_t PacketType;
+    uint8_t SecondaryHeaderFlag;
+    uint8_t ProcessID;
+    uint8_t PacketCategory;
+    uint8_t SequenceFlags;
+    uint16_t PacketSequenceCount;
+    uint16_t PacketDataLength;
+    uint32_t Time;
+    float FineTime;
+    uint32_t SyncMarker;
+    uint32_t DataTakeID;
+    ECCNumber ECCNumber;
+    TestMode TestMode;
+    bool RxChannelId;
+    uint32_t InstrumentConfigID;
+    uint8_t WordIndex;
+    uint16_t WordVal;
+    uint32_t SpacePacketCount;
+    uint32_t PRICount;
+    BAQMode BAQMode;
+    bool ErrorFlag;
+    uint32_t BAQBlockLength;
+    RangeDecimation RangeDecimation;
+    float RxGain;
+    float TxRampRate;
+    float TxPulseStartFreq;
+    float TxPulseLength;
+    uint8_t Rank;
+    float PulseRepetitionInterval;
+    float SamplingWindowStartTime;
+    float SamplingWindowLength;
+    Polarisation Polarisation;
+    bool SSBFlag;
+    TemperatureCompensation  TemperatureCompensation;
+    uint8_t ElevationBeamAddress;
+    uint16_t AzimuthBeamAddress;
+    bool SASTestMode;
+    CalType CalType;
+    uint16_t CalibrationBeamAddress;
+    uint8_t CalMode;
+    uint8_t TxPulseNumber;
+    SignalType SignalType;
+    bool SwapFlag;
+    uint8_t SwathNumber;
+};
+
+float calcRxGain(uint8_t rawRxGain) {
+    return -(static_cast<float>(rawRxGain) * 0.5);
+}
+
+float calcTxPulseRampRate(uint16_t rawTxPulseRampRate) {
+    rawTxPulseRampRate = _byteswap_ushort(rawTxPulseRampRate);
+    float fRef = 37.53472224;
+    uint8_t sign = std::bitset<16>(rawTxPulseRampRate)[0];
+    uint16_t value = rawTxPulseRampRate & 0xFFFE;
+    return std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -21);
+}
+
+float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate) {
+    rawTxPulseStartFreq = _byteswap_ushort(rawTxPulseStartFreq);
+    float fRef = 37.53472224;
+    uint8_t sign = std::bitset<16>(rawTxPulseStartFreq)[0];
+    uint16_t value = rawTxPulseStartFreq & 0xFFFE;
+    return TxPulseRampRate /(4 * fRef) + std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -14);
+}
+
+float calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
+    rawTxPulseStartFreq = _byteswap_ulong(rawTxPulseStartFreq);
+    float fRef = 37.53472224;
+    return static_cast<float>(rawTxPulseStartFreq) / fRef;
+}
+
+float calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval) {
+    rawPulseRepetitionInterval = _byteswap_ulong(rawPulseRepetitionInterval);
+    float fRef = 37.53472224;
+    return static_cast<float>(rawPulseRepetitionInterval) / fRef;
+}
+
+float calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime) {
+    rawSamplingWindowStartTime = _byteswap_ulong(rawSamplingWindowStartTime);
+    float fRef = 37.53472224;
+    return static_cast<float>(rawSamplingWindowStartTime) / fRef;
+}
+
+float calcSamplingWindowLength(uint32_t rawSamplingWindowLength) {
+    rawSamplingWindowLength = _byteswap_ulong(rawSamplingWindowLength);
+    float fRef = 37.53472224;
+    return static_cast<float>(rawSamplingWindowLength) / fRef;
+}
+
+float calcFineTime(uint16_t rawFineTime) {
+    rawFineTime = _byteswap_ushort(rawFineTime);
+    return (static_cast<float>(rawFineTime) + 0.5) * std::pow(2, -16.0);
+}
+
+uint32_t calcInstrumentConfigID(uint32_t rawInstrumentConfigID) {
+    return _byteswap_ulong(rawInstrumentConfigID);
+}
+
+uint32_t read24Bit(std::ifstream &f) {
+    uint8_t tmp8 = 0;
+    uint16_t tmp16 = 0;
+    f.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+    f.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
+    tmp16 = _byteswap_ushort(tmp16);
+    return (tmp16 << 8) & tmp8;
+}
+
 int ReadSARParam(std::filesystem::path pathToRawData) {
     uint8_t tmp8 = 0;
     uint16_t tmp16 = 0;
@@ -331,6 +395,7 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
     Sentinel1RawPacket sentinelOneParam;
 
     while (!rawData.eof()) {
+        // Octet 0,1
         rawData.read(reinterpret_cast<char*>(&tmp16), 2);
         tmp16 = _byteswap_ushort(tmp16);
         sentinelOneParam.PacketVersionNumber = tmp16 & 0x7;
@@ -339,45 +404,56 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         sentinelOneParam.ProcessID = (tmp16 >> 4) & 0x7F;
         sentinelOneParam.PacketCategory = (tmp16) & 0xF;
 
+        // Octet 2,3
         rawData.read(reinterpret_cast<char*>(&tmp16), 2);
         tmp16 = _byteswap_ushort(tmp16);
         sentinelOneParam.SequenceFlags = (tmp16 >> 14);
         sentinelOneParam.PacketSequenceCount = (tmp16 & 0x3FF);
 
+        // Octet 4,5
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PacketDataLength), sizeof(sentinelOneParam.PacketDataLength));
         sentinelOneParam.PacketDataLength = _byteswap_ushort(sentinelOneParam.PacketDataLength) + 1;
         if (((sentinelOneParam.PacketDataLength + 6) % 4) != 0) {
-            printf("\nERROR: Length not multiple of 4\n");
+            std::cerr << "ERROR: Length not multiple of 4." << std::endl;
         }
         
+        // Octet 6,7,8,9
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Time), sizeof(sentinelOneParam.Time));
         sentinelOneParam.Time = _byteswap_ulong(sentinelOneParam.Time);
         
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.FineTime), sizeof(sentinelOneParam.FineTime));
-        sentinelOneParam.FineTime = _byteswap_ushort(sentinelOneParam.FineTime);
-        
+        // Octet 10,11
+        rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(uint16_t));
+        sentinelOneParam.FineTime = calcFineTime(tmp16);
+
+        // Octet 12,13,14,15
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SyncMarker), sizeof(sentinelOneParam.SyncMarker));
         sentinelOneParam.SyncMarker = _byteswap_ulong(sentinelOneParam.SyncMarker);
         
         if (sentinelOneParam.SyncMarker != 0x352EF853) {
             std::cerr << "ERROR: Sync marker != 352EF853" << std::endl;
         }
-        
+
+        // Octet 16,17,18,19
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.DataTakeID), sizeof(sentinelOneParam.DataTakeID));
+        sentinelOneParam.DataTakeID = _byteswap_ulong(sentinelOneParam.DataTakeID);
 
+        // Octet 20
         rawData.read(reinterpret_cast<char*>(&tmp8), 1);
-        sentinelOneParam.ECCNumber = tmp8;
-
+        sentinelOneParam.ECCNumber = static_cast<ECCNumber>(tmp8);
+        
+        // Octet 21
         rawData.read(reinterpret_cast<char*>(&tmp8), 1);
-        sentinelOneParam.TestMode = tmp8;
-        sentinelOneParam.RxChannelId = tmp8;
+        sentinelOneParam.TestMode = static_cast<TestMode>(tmp8 & 0x0E);
+        sentinelOneParam.RxChannelId = tmp8 & 0xF0;
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.InstrumentConfigID), sizeof(sentinelOneParam.InstrumentConfigID));
-        sentinelOneParam.InstrumentConfigID = _byteswap_ulong(sentinelOneParam.InstrumentConfigID);
+        // Octet 22,23,24,25
+        rawData.read(reinterpret_cast<char*>(&tmp32), sizeof(uint32_t));
+        sentinelOneParam.InstrumentConfigID = calcInstrumentConfigID(tmp32);
 
+        // Octet 26
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.WordIndex), sizeof(sentinelOneParam.WordIndex));
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.WordVal), sizeof(sentinelOneParam.WordVal));
-        sentinelOneParam.WordVal = _byteswap_ushort(sentinelOneParam.WordVal);
+        rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(uint16_t));
+        sentinelOneParam.WordVal = _byteswap_ushort(tmp16);
 
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SpacePacketCount), sizeof(sentinelOneParam.SpacePacketCount));
         sentinelOneParam.SpacePacketCount = _byteswap_ulong(sentinelOneParam.SpacePacketCount);
@@ -385,67 +461,70 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PRICount), sizeof(sentinelOneParam.PRICount));
         sentinelOneParam.PRICount = _byteswap_ulong(sentinelOneParam.PRICount);
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PRICount), sizeof(sentinelOneParam.PRICount));
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.BAQMode = static_cast<BAQMode>(tmp8 & 0x1f);
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.BAQMode), sizeof(sentinelOneParam.BAQMode));
-        sentinelOneParam.BAQMode = sentinelOneParam.BAQMode & 0x1f;
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.ErrorFlag = std::bitset<8>(tmp8)[0];
+
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.BAQBlockLength = 8 * (tmp8 + 1);
+
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.RangeDecimation = static_cast<RangeDecimation>(tmp8);
+
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.RxGain = calcRxGain(tmp8);
+
+        rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
+        sentinelOneParam.TxRampRate = calcTxPulseRampRate(tmp16);
+
+        rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
+        sentinelOneParam.TxPulseStartFreq = calcTxPulseStartFreq(tmp16, sentinelOneParam.TxRampRate);
         
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.ErrorFlag), sizeof(sentinelOneParam.ErrorFlag));
-        
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.BAQBlockLength), sizeof(sentinelOneParam.BAQBlockLength));
+        sentinelOneParam.TxPulseLength = calcTxPulseLength(read24Bit(rawData));
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.RangeDecimation), sizeof(sentinelOneParam.RangeDecimation));
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.Rank = tmp8 & 0xF8;
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.RxGain), sizeof(sentinelOneParam.RxGain));
+        sentinelOneParam.PulseRepetitionInterval = calcPulseRepetitionInterval(read24Bit(rawData));
+        sentinelOneParam.SamplingWindowStartTime = calcSamplingWindowStartTime(read24Bit(rawData));
+        sentinelOneParam.SamplingWindowLength = calcSamplingWindowLength(read24Bit(rawData));
 
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxRampRate), sizeof(sentinelOneParam.TxRampRate));
-        sentinelOneParam.TxRampRate = _byteswap_ushort(sentinelOneParam.TxRampRate);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseStartFreq), sizeof(sentinelOneParam.TxPulseStartFreq));
-        sentinelOneParam.TxPulseStartFreq = _byteswap_ushort(sentinelOneParam.TxPulseStartFreq);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseLength), sizeof(sentinelOneParam.TxPulseLength));
-        sentinelOneParam.TxPulseLength = _byteswap_ulong(sentinelOneParam.TxPulseLength);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Rank), sizeof(sentinelOneParam.Rank));
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PulseRepetitionInterval), sizeof(sentinelOneParam.PulseRepetitionInterval));
-        sentinelOneParam.PulseRepetitionInterval = _byteswap_ulong(sentinelOneParam.PulseRepetitionInterval);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SamplingWindowStartTime), sizeof(sentinelOneParam.SamplingWindowStartTime));
-        sentinelOneParam.SamplingWindowStartTime = _byteswap_ulong(sentinelOneParam.SamplingWindowStartTime);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SamplingWindowLength), sizeof(sentinelOneParam.SamplingWindowLength));
-        sentinelOneParam.SamplingWindowLength = _byteswap_ulong(sentinelOneParam.SamplingWindowLength);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.Polarisation), sizeof(sentinelOneParam.Polarisation));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TemperatureCompensation), sizeof(sentinelOneParam.TemperatureCompensation));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.ElevationBeamAddress), sizeof(sentinelOneParam.ElevationBeamAddress));
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.AzimuthBeamAddress), sizeof(sentinelOneParam.AzimuthBeamAddress));
-        sentinelOneParam.AzimuthBeamAddress = _byteswap_ushort(sentinelOneParam.AzimuthBeamAddress);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SASTestMode), sizeof(sentinelOneParam.SASTestMode));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalType), sizeof(sentinelOneParam.CalType));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalibrationBeamAddress), sizeof(sentinelOneParam.CalibrationBeamAddress));
-        sentinelOneParam.CalibrationBeamAddress = _byteswap_ushort(sentinelOneParam.CalibrationBeamAddress);
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.CalMode), sizeof(sentinelOneParam.CalMode));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.TxPulseNumber), sizeof(sentinelOneParam.TxPulseNumber));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SignalType), sizeof(sentinelOneParam.SignalType));
-
-        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SwapFlag), sizeof(sentinelOneParam.SwapFlag));
-
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.SSBFlag = std::bitset<8>(tmp8)[0];
+        sentinelOneParam.Polarisation = static_cast<Polarisation>(tmp8 & 0x0E);
+        sentinelOneParam.TemperatureCompensation = static_cast<TemperatureCompensation>(tmp8 & 0x30);
+        if (sentinelOneParam.SSBFlag == 0) {
+            rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+            sentinelOneParam.ElevationBeamAddress = tmp8 & 0x0F;
+            tmp16 = tmp8 & 0xC0;
+            rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+            sentinelOneParam.AzimuthBeamAddress = tmp16 & (tmp8 << 2);
+        } 
+        else {
+            rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+            sentinelOneParam.SASTestMode = std::bitset<8>(tmp8)[0];
+            sentinelOneParam.CalType = static_cast<CalType>(tmp8 & 0x0E);
+            tmp16 = tmp8 & 0xC0;
+            rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+            sentinelOneParam.CalibrationBeamAddress = tmp16 & (tmp8 << 2);
+        }
+        // Octet 62
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.CalMode = tmp8 & 0x3;
+        sentinelOneParam.TxPulseNumber = tmp8 & 0xF8;
+        // Octet 63
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+        sentinelOneParam.SignalType = static_cast<SignalType>(tmp8 & 0x0F);
+        sentinelOneParam.SwapFlag = std::bitset<8>(tmp8)[7];
+        // Octet 64
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SwathNumber), sizeof(sentinelOneParam.SwathNumber));
 
-        if ((sentinelOneParam.BAQMode == 0x00) && (sentinelOneParam.CalType > 7)) {
+        if ((sentinelOneParam.BAQMode == BAQMode::BypassMode) && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
             //cposition = bypass(user, NQ, IE, IO, QE, QO);
         }
-        if ((sentinelOneParam.BAQMode == 0x0c) && (sentinelOneParam.CalType == 0)) {
+        if ((sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) && (sentinelOneParam.CalType == CalType::TxCal)) {
             //cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
         }
     }; 
@@ -747,16 +826,14 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
     
     BRCindex = 0;
     hcode_index = 0;
-    do // repeat until end of packet: depends on NQ
-    {//msg("\npos:%d:",bposition);
+    do {
         BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
         BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
         BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
         brc[*brcpos] = BRCn[BRCindex];
         (*brcpos)++;
         if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
+        for (h = 0; h < inc; h++) {
             hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
             hcode_index++;
         }
@@ -766,10 +843,10 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
     if (bposition != 7) { 
         bposition = 7; 
         cposition++; 
-    } // start at new position
+    } 
     if ((cposition & 1) != 0) { 
         cposition++; 
-    }        // odd address => +1 
+    }         
     BRCindex = 0;
     hcode_index = 0;
     do
@@ -786,21 +863,18 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
     if (bposition != 7) { 
         bposition = 7; 
         cposition++; 
-    } // start at new position
+    } 
     if ((cposition & 1) != 0) { 
         cposition++; 
-    }     // odd address => +1 
+    }      
     BRCindex = 0;
     hcode_index = 0;
     do
     {
         THIDXn[BRCindex] = get_THIDX(p, &cposition, &bposition);
-        //   THIDXn[BRCindex]=p[cposition]; // 8-bit THIDX
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-      //      msg("%d",hcodeQE[hcode_index]);
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      
+        for (h = 0; h < inc; h++) {
+            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); 
             hcode_index++;
         }
         BRCindex++;

@@ -335,8 +335,8 @@ float calcTxPulseRampRate(uint16_t rawTxPulseRampRate) {
 float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate) {
     rawTxPulseStartFreq = _byteswap_ushort(rawTxPulseStartFreq);
     float fRef = 37.53472224;
-    uint8_t sign = std::bitset<16>(rawTxPulseStartFreq)[0];
-    uint16_t value = rawTxPulseStartFreq & 0xFFFE;
+    uint8_t sign = std::bitset<16>(rawTxPulseStartFreq)[15];
+    uint16_t value = rawTxPulseStartFreq & 0x7FFF;
     return TxPulseRampRate /(4 * fRef) + std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -14);
 }
 
@@ -377,6 +377,86 @@ uint32_t read24Bit(std::ifstream &f) {
     tmp16 = _byteswap_ushort(tmp16);
     return (tmp8 << 8) | tmp16;
 }
+
+/*packet_version_number	0
+packet_type	0
+secondary_header_flag	1
+application_process_id_process_id	65
+application_process_id_packet_category	12
+sequence_flags	3
+sequence_count	0
+data_length	32381
+coarse_time	1366374707
+fine_time	63095
+sync_marker	892270675
+data_take_id	194628384
+ecc_number	11
+ignore_0	0
+test_mode	0
+rx_channel_id	1
+instrument_configuration_id	7
+sub_commutated_index	1
+sub_commutated_data	49426
+space_packet_count	0
+pri_count	3775
+error_flag	0
+ignore_1	0
+baq_mode	5
+baq_block_length	31
+ignore_2	0
+range_decimation	1
+rx_gain	12
+tx_ramp_rate_polarity	1
+tx_ramp_rate_magnitude	2869
+tx_pulse_start_frequency_polarity	0
+tx_pulse_start_frequency_magnitude	19125
+tx_pulse_length	1706
+ignore_3	0
+rank	9
+pulse_repetition_interval	20065
+sampling_window_start_time	4366
+sampling_window_length	9715
+sab_ssb_calibration_p	0
+sab_ssb_polarisation	7
+sab_ssb_temp_comp	0
+sab_ssb_ignore_0	0
+sab_ssb_elevation_beam_address	0
+sab_ssb_ignore_1	0
+sab_ssb_azimuth_beam_address	0
+ses_ssb_cal_mode	1
+ses_ssb_ignore_0	0
+ses_ssb_tx_pulse_number	0
+ses_ssb_signal_type	1
+ses_ssb_ignore_1	0
+ses_ssb_swap	0
+ses_ssb_swath_number	0
+number_of_quads	12886
+ignore_4	0
+azi	0
+baq_n	31
+baqmod	5
+cal_iter	0
+ele_count	0
+cal_mode	1
+cal_p	0
+cal_type	0
+data_delay	4406
+offset	0
+packet_idx	0
+pol	7
+rgdec	1
+rx	1
+signal_type	1
+swath	0
+swl	9715
+swst	4366
+tstmod	0
+txpl	45.4512
+txpl_	1706
+txprr	-1.92738
+txprr_	-2869
+txpsf	43.8013
+*/
 
 int ReadSARParam(std::filesystem::path pathToRawData) {
     uint8_t tmp8 = 0;

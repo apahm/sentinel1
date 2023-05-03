@@ -327,9 +327,9 @@ float calcRxGain(uint8_t rawRxGain) {
 float calcTxPulseRampRate(uint16_t rawTxPulseRampRate) {
     rawTxPulseRampRate = _byteswap_ushort(rawTxPulseRampRate);
     float fRef = 37.53472224;
-    uint8_t sign = std::bitset<16>(rawTxPulseRampRate)[0];
-    uint16_t value = rawTxPulseRampRate & 0xFFFE;
-    return std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -21);
+    uint8_t sign = std::bitset<16>(rawTxPulseRampRate)[15];
+    uint16_t value = rawTxPulseRampRate & 0x7FFF;
+    return std::pow(-1, sign) * static_cast<float>(value) * std::pow(fRef, 2) * std::pow(2, -21);
 }
 
 float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate) {
@@ -340,26 +340,22 @@ float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate) 
     return TxPulseRampRate /(4 * fRef) + std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -14);
 }
 
-float calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
-    rawTxPulseStartFreq = _byteswap_ulong(rawTxPulseStartFreq);
+uint32_t calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
     float fRef = 37.53472224;
     return static_cast<float>(rawTxPulseStartFreq) / fRef;
 }
 
 float calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval) {
-    rawPulseRepetitionInterval = _byteswap_ulong(rawPulseRepetitionInterval);
     float fRef = 37.53472224;
     return static_cast<float>(rawPulseRepetitionInterval) / fRef;
 }
 
 float calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime) {
-    rawSamplingWindowStartTime = _byteswap_ulong(rawSamplingWindowStartTime);
     float fRef = 37.53472224;
     return static_cast<float>(rawSamplingWindowStartTime) / fRef;
 }
 
 float calcSamplingWindowLength(uint32_t rawSamplingWindowLength) {
-    rawSamplingWindowLength = _byteswap_ulong(rawSamplingWindowLength);
     float fRef = 37.53472224;
     return static_cast<float>(rawSamplingWindowLength) / fRef;
 }
@@ -378,8 +374,7 @@ uint32_t read24Bit(std::ifstream &f) {
     uint16_t tmp16 = 0;
     f.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
     f.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
-    tmp16 = _byteswap_ushort(tmp16);
-    return (tmp16 << 8) & tmp8;
+    return (tmp16 << 8) | tmp8;
 }
 
 int ReadSARParam(std::filesystem::path pathToRawData) {
@@ -398,9 +393,9 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         // Octet 0,1
         rawData.read(reinterpret_cast<char*>(&tmp16), 2);
         tmp16 = _byteswap_ushort(tmp16);
-        sentinelOneParam.PacketVersionNumber = tmp16 & 0x7;
-        sentinelOneParam.PacketType = tmp16 & 0x8;
-        sentinelOneParam.SecondaryHeaderFlag = (tmp16 >> 11) & 0x01;
+        sentinelOneParam.PacketVersionNumber = (tmp16 >> 12);
+        sentinelOneParam.PacketType = std::bitset<16>(tmp16)[12];
+        sentinelOneParam.SecondaryHeaderFlag = std::bitset<16>(tmp16)[11];
         sentinelOneParam.ProcessID = (tmp16 >> 4) & 0x7F;
         sentinelOneParam.PacketCategory = (tmp16) & 0xF;
 
@@ -444,7 +439,7 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         // Octet 21
         rawData.read(reinterpret_cast<char*>(&tmp8), 1);
         sentinelOneParam.TestMode = static_cast<TestMode>(tmp8 & 0x0E);
-        sentinelOneParam.RxChannelId = tmp8 & 0xF0;
+        sentinelOneParam.RxChannelId = std::bitset<16>(tmp16)[4];
 
         // Octet 22,23,24,25
         rawData.read(reinterpret_cast<char*>(&tmp32), sizeof(uint32_t));
@@ -474,6 +469,9 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.BAQBlockLength = 8 * (tmp8 + 1);
         
+        // Octet 39
+        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+
         // Octet 40
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.RangeDecimation = static_cast<RangeDecimation>(tmp8);
@@ -930,4 +928,10 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
     reconstruction(BRCn, THIDXn, hcodeQE, NQ, QE);
     reconstruction(BRCn, THIDXn, hcodeQO, NQ, QO);
     return(cposition);
+}
+
+int main() {
+    ReadSARParam("C:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
+
+    return 0;
 }

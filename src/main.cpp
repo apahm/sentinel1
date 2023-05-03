@@ -374,7 +374,8 @@ uint32_t read24Bit(std::ifstream &f) {
     uint16_t tmp16 = 0;
     f.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
     f.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
-    return (tmp16 << 8) | tmp8;
+    tmp16 = _byteswap_ushort(tmp16);
+    return (tmp8 << 8) | tmp16;
 }
 
 int ReadSARParam(std::filesystem::path pathToRawData) {
@@ -931,7 +932,7 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
 }
 
 int main() {
-    ReadSARParam("C:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
+    ReadSARParam("D:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
 
     return 0;
 }

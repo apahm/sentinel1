@@ -452,61 +452,79 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
 
         // Octet 26
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.WordIndex), sizeof(sentinelOneParam.WordIndex));
+        
+        // Octet 27, 28
         rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(uint16_t));
         sentinelOneParam.WordVal = _byteswap_ushort(tmp16);
 
+        // Octet 29, 30, 31, 32
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SpacePacketCount), sizeof(sentinelOneParam.SpacePacketCount));
         sentinelOneParam.SpacePacketCount = _byteswap_ulong(sentinelOneParam.SpacePacketCount);
         
+        // Octet 33, 34, 35, 36
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.PRICount), sizeof(sentinelOneParam.PRICount));
         sentinelOneParam.PRICount = _byteswap_ulong(sentinelOneParam.PRICount);
 
+        // Octet 37
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.BAQMode = static_cast<BAQMode>(tmp8 & 0x1f);
-
-        rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.ErrorFlag = std::bitset<8>(tmp8)[0];
-
+        
+        // Octet 38
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.BAQBlockLength = 8 * (tmp8 + 1);
-
+        
+        // Octet 40
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.RangeDecimation = static_cast<RangeDecimation>(tmp8);
-
+        
+        // Octet 41
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.RxGain = calcRxGain(tmp8);
 
+        // Octet 42, 43
         rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
         sentinelOneParam.TxRampRate = calcTxPulseRampRate(tmp16);
 
+        // Octet 44, 45
         rawData.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
         sentinelOneParam.TxPulseStartFreq = calcTxPulseStartFreq(tmp16, sentinelOneParam.TxRampRate);
         
+        // Octet 46, 47, 48
         sentinelOneParam.TxPulseLength = calcTxPulseLength(read24Bit(rawData));
 
+        // Octet 49
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.Rank = tmp8 & 0xF8;
 
+        // Octet 50, 51, 52
         sentinelOneParam.PulseRepetitionInterval = calcPulseRepetitionInterval(read24Bit(rawData));
+        // Octet 53, 54, 55
         sentinelOneParam.SamplingWindowStartTime = calcSamplingWindowStartTime(read24Bit(rawData));
+        // Octet 56, 57, 58
         sentinelOneParam.SamplingWindowLength = calcSamplingWindowLength(read24Bit(rawData));
 
+        // Octet 59
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.SSBFlag = std::bitset<8>(tmp8)[0];
         sentinelOneParam.Polarisation = static_cast<Polarisation>(tmp8 & 0x0E);
         sentinelOneParam.TemperatureCompensation = static_cast<TemperatureCompensation>(tmp8 & 0x30);
         if (sentinelOneParam.SSBFlag == 0) {
+            // Octet 60
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
             sentinelOneParam.ElevationBeamAddress = tmp8 & 0x0F;
             tmp16 = tmp8 & 0xC0;
+            // Octet 61
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
             sentinelOneParam.AzimuthBeamAddress = tmp16 & (tmp8 << 2);
         } 
         else {
+            // Octet 60
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
             sentinelOneParam.SASTestMode = std::bitset<8>(tmp8)[0];
             sentinelOneParam.CalType = static_cast<CalType>(tmp8 & 0x0E);
             tmp16 = tmp8 & 0xC0;
+            // Octet 61
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
             sentinelOneParam.CalibrationBeamAddress = tmp16 & (tmp8 << 2);
         }

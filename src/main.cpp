@@ -149,18 +149,11 @@ void IQQuadratureDeparture(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnaly
         C[i] = 0.5 * std::log((1 + C[i])/ (1 - C[i]));
     }
 
-    double sum = 0.0;
-
-    for (size_t i = 0; i < C.size(); i++) {
-        sum += std::accumulate(C.begin(), C.end(), 0);
-    }
-    sum = sum / C.size();
-
-
+    double sum = std::accumulate(C.begin(), C.end(), 0) / C.size();
+    
     rawDataAnalysis.IQQuadratureDeparture = 0;
     rawDataAnalysis.IQQuadratureDepartureLowerBounds = 0;
     rawDataAnalysis.IQQuadratureDepartureUpperBounds = 0;
-
 }
 
 // Set the statistics significance flags

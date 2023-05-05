@@ -6,12 +6,42 @@
 #include <fstream>
 #include <intrin.h>
 #include <bitset>
+#include <algorithm>
+#include <numeric>
 
 template<typename T>
 struct Point {
     T x = static_cast <typeid(T).name()>(0);
     T y = static_cast <typeid(T).name()>(0);
     T z = static_cast <typeid(T).name()>(0);
+};
+
+/*
+Raw data analysis is required in order to perform corrections of the I and Q channels 
+of the raw signal data.
+    I/Q bias removal
+    I/Q gain imbalance correction
+    I/Q non - orthogonality correction
+For Sentinel-1 however, the instrument’s receive module performs the demodulation
+in the digital domain, therefore the I/Q gain imbalance and I/Q non-orthogonality
+corrections are no longer necessary.
+*/
+
+struct RawDataAnalysis {
+    double meanOfRawDataI = 0.0;
+    double meanOfRawDataQ = 0.0;
+    double standardDeviationsOfRawDataI = 0.0;
+    double standardDeviationsOfRawDataQ = 0.0;
+    double IQGainImbalance = 0.0;
+    double IQGainImbalanceLowerBounds = 0.0;
+    double IQGainImbalanceUpperBounds = 0.0;
+    double IQQuadratureDeparture = 0.0;
+    double IQQuadratureDepartureLowerBounds = 0.0;
+    double IQQuadratureDepartureUpperBounds = 0.0;
+    bool IBiasSignificanceFlag = false;
+    bool QBiasSignificanceFlag = false;
+    bool IQGainSignificanceFlag = false;
+    bool IQQuadratureDepartureSignificantFlag = false;
 };
 
 struct ComplexMatrix {
@@ -21,42 +51,98 @@ struct ComplexMatrix {
     uint64_t cols = 0;
 };
 
+void MeanOfRawData(ComplexMatrix &rawData, RawDataAnalysis& rawDataAnalysis) {
+    double sumI = 0.0;
+    double sumQ = 0.0;
 
-struct RangeReferenceFunction {
-    std::vector<std::complex<float>> refFunc;
-};
-
-// Calculate the mean of the raw data.
-template<typename T>
-double MeanOfRawData(ComplexMatrix &rawData) {
-    double sum = 0.0;
-
-    for (size_t i = 0; i < re.size(); i++) {
-        sum += static_cast<double>(accumulate(rawData.re[i].begin(), rawData.re[i].end(), 0));
+    for (size_t i = 0; i < rawData.re.size(); i++) {
+        sumI += static_cast<double>(std::accumulate(rawData.re[i].begin(), rawData.re[i].end(), 0));
     }
 
-    sum = sum / (static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols));
-    return sum;
+    for (size_t i = 0; i < rawData.im.size(); i++) {
+        sumQ += static_cast<double>(std::accumulate(rawData.im[i].begin(), rawData.im[i].end(), 0));
+    }
+
+    rawDataAnalysis.meanOfRawDataI = sumI;
+    rawDataAnalysis.meanOfRawDataQ = sumQ;
+
+    sumI = sumI / (static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols));
+    sumQ = sumQ / (static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols));
 }
 
 // Calculate the standard deviations of the raw data.
-template<typename T>
-T StandardDeviationsOfRawData(std::vector<std::vector<T>> rawData) {
+void StandardDeviationsOfRawData(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    double k = 1 / static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols);
     
-    std::sqrt();
-    return static_cast <typeid(T).name()>(0);
+    double sumIMinusMean = 0.0;
+    double sumQMinusMean = 0.0;
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        for (size_t j = 0; j < rawData.cols; j++) {
+            sumIMinusMean += std::pow(rawData.re[i][j] - rawDataAnalysis.meanOfRawDataI, 2);
+            sumQMinusMean += std::pow(rawData.im[i][j] - rawDataAnalysis.meanOfRawDataQ, 2);
+        }
+    }
+
+    rawDataAnalysis.standardDeviationsOfRawDataI = std::sqrt(k * sumIMinusMean);
+    rawDataAnalysis.standardDeviationsOfRawDataQ = std::sqrt(k * sumQMinusMean);
 }
 
 // Calculate the IQ gain imbalance
-template<typename T>
-T IQGainImbalance(std::vector<std::vector<T>> rawData) {
-    return static_cast <typeid(T).name()>(0);
+void IQGainImbalance(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    double k = 1 / static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols);
+
+    rawDataAnalysis.IQGainImbalance = rawDataAnalysis.standardDeviationsOfRawDataI / rawDataAnalysis.standardDeviationsOfRawDataQ;
+    rawDataAnalysis.IQGainImbalanceLowerBounds = 1 - 3 / std::sqrt(k);
+    rawDataAnalysis.IQGainImbalanceUpperBounds = 1 + 3 / std::sqrt(k);
 }
 
 // IQ quadrature departure
-template<typename T>
-T IQQuadratureDeparture(std::vector<std::vector<T>> rawData) {
-    return static_cast <typeid(T).name()>(0);
+void IQQuadratureDeparture(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    std::vector<double> SI;
+    std::vector<double> SQ;
+
+    std::vector<double> SII;
+    std::vector<double> SQQ;
+
+    std::vector<double> SIQ;
+    
+    std::vector<double> C;
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        SI.push_back(static_cast<double>(std::accumulate(rawData.re[i].begin(), rawData.re[i].end(), 0)));
+        SQ.push_back(static_cast<double>(std::accumulate(rawData.im[i].begin(), rawData.im[i].end(), 0)));
+    }
+    
+    double tempSum = 0.0;
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        tempSum = 0.0;
+        for (size_t j = 0; j < rawData.cols; j++) {
+            tempSum += std::pow(rawData.im[i][j], 2);
+        }
+        SQQ.push_back(tempSum - SQ[i] * SQ[i] / rawData.cols);
+    }
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        tempSum = 0.0;
+        for (size_t j = 0; j < rawData.cols; j++) {
+            tempSum += std::pow(rawData.re[i][j], 2);
+        }
+        SII.push_back(tempSum - SI[i] * SI[i] / rawData.cols);
+    }
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        tempSum = 0.0;
+        for (size_t j = 0; j < rawData.cols; j++) {
+            tempSum += rawData.re[i][j] * rawData.im[i][j];
+        }
+        SIQ.push_back(tempSum - SI[i] * SQ[i] / rawData.cols);
+    }
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        C.push_back(SIQ[i] / std::sqrt(SII[i] * SQQ[i]));
+    }
 }
 
 // Set the statistics significance flags
@@ -318,6 +404,7 @@ struct Sentinel1RawPacket {
     SignalType SignalType;
     bool SwapFlag;
     uint8_t SwathNumber;
+    uint16_t NumberOfQuads;
 };
 
 float calcRxGain(uint8_t rawRxGain) {
@@ -519,8 +606,8 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         
         // Octet 21
         rawData.read(reinterpret_cast<char*>(&tmp8), 1);
-        sentinelOneParam.TestMode = static_cast<TestMode>(tmp8 & 0x0E);
-        sentinelOneParam.RxChannelId = std::bitset<16>(tmp16)[4];
+        sentinelOneParam.TestMode = static_cast<TestMode>(0/*tmp8 & 0x0E*/);
+        sentinelOneParam.RxChannelId = std::bitset<8>(tmp8)[0];
 
         // Octet 22,23,24,25
         rawData.read(reinterpret_cast<char*>(&tmp32), sizeof(uint32_t));
@@ -544,7 +631,7 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         // Octet 37
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         sentinelOneParam.BAQMode = static_cast<BAQMode>(tmp8 & 0x1f);
-        sentinelOneParam.ErrorFlag = std::bitset<8>(tmp8)[0];
+        sentinelOneParam.ErrorFlag = std::bitset<8>(tmp8)[7];
         
         // Octet 38
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
@@ -574,7 +661,7 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
 
         // Octet 49
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-        sentinelOneParam.Rank = tmp8 & 0xF8;
+        sentinelOneParam.Rank = tmp8 & 0x1F;
 
         // Octet 50, 51, 52
         sentinelOneParam.PulseRepetitionInterval = calcPulseRepetitionInterval(read24Bit(rawData));
@@ -585,13 +672,13 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
 
         // Octet 59
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-        sentinelOneParam.SSBFlag = std::bitset<8>(tmp8)[0];
-        sentinelOneParam.Polarisation = static_cast<Polarisation>(tmp8 & 0x0E);
-        sentinelOneParam.TemperatureCompensation = static_cast<TemperatureCompensation>(tmp8 & 0x30);
+        sentinelOneParam.SSBFlag = std::bitset<8>(tmp8)[7];
+        sentinelOneParam.Polarisation = static_cast<Polarisation>((tmp8 & 0x70) >> 4);
+        sentinelOneParam.TemperatureCompensation = static_cast<TemperatureCompensation>(tmp8 & 0x0C);
         if (sentinelOneParam.SSBFlag == 0) {
             // Octet 60
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-            sentinelOneParam.ElevationBeamAddress = tmp8 & 0x0F;
+            sentinelOneParam.ElevationBeamAddress = (tmp8 & 0xF0) >> 4;
             tmp16 = tmp8 & 0xC0;
             // Octet 61
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
@@ -609,14 +696,18 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         }
         // Octet 62
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-        sentinelOneParam.CalMode = tmp8 & 0x3;
-        sentinelOneParam.TxPulseNumber = tmp8 & 0xF8;
+        sentinelOneParam.CalMode = (tmp8 & 0xC0) >> 6;
+        sentinelOneParam.TxPulseNumber = tmp8 & 0x1F;
         // Octet 63
         rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-        sentinelOneParam.SignalType = static_cast<SignalType>(tmp8 & 0x0F);
-        sentinelOneParam.SwapFlag = std::bitset<8>(tmp8)[7];
+        sentinelOneParam.SignalType = static_cast<SignalType>((tmp8 & 0xF0) >> 4);
+        sentinelOneParam.SwapFlag = std::bitset<8>(tmp8)[0];
         // Octet 64
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.SwathNumber), sizeof(sentinelOneParam.SwathNumber));
+
+        // Octet 65, 66
+        rawData.read(reinterpret_cast<char*>(&sentinelOneParam.NumberOfQuads), sizeof(sentinelOneParam.NumberOfQuads));
+        sentinelOneParam.NumberOfQuads = _byteswap_ushort(sentinelOneParam.NumberOfQuads);
 
         if ((sentinelOneParam.BAQMode == BAQMode::BypassMode) && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
             //cposition = bypass(user, NQ, IE, IO, QE, QO);
@@ -1012,7 +1103,7 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
 }
 
 int main() {
-    ReadSARParam("D:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
+    ReadSARParam("C:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
 
     return 0;
 }

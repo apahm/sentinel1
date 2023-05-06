@@ -9,13 +9,6 @@
 #include <algorithm>
 #include <numeric>
 
-template<typename T>
-struct Point {
-    T x = static_cast <typeid(T).name()>(0);
-    T y = static_cast <typeid(T).name()>(0);
-    T z = static_cast <typeid(T).name()>(0);
-};
-
 /*
 Raw data analysis is required in order to perform corrections of the I and Q channels 
 of the raw signal data.
@@ -50,6 +43,8 @@ struct ComplexMatrix {
     uint64_t rows = 0;
     uint64_t cols = 0;
 };
+
+
 
 void MeanOfRawData(ComplexMatrix &rawData, RawDataAnalysis& rawDataAnalysis) {
     double sumI = 0.0;
@@ -97,51 +92,46 @@ void IQGainImbalance(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
     rawDataAnalysis.IQGainImbalanceUpperBounds = 1 + 3 / std::sqrt(k);
 }
 
+double getRowSumI(ComplexMatrix& rawData, uint64_t number) {
+    return std::accumulate(rawData.re[number].begin(), rawData.re[number].end(), 0);
+}
+
+double getRow2SumI(ComplexMatrix& rawData, uint64_t number) {
+    double sum = 0.0;
+    for (size_t i = 0; i < rawData.cols; i++) {
+        sum += std::pow(rawData.re[number].at(i),2);
+    }
+    return sum;
+}
+
+double getRowSumQ(ComplexMatrix& rawData, uint64_t number) {
+    return std::accumulate(rawData.im[number].begin(), rawData.im[number].end(), 0);
+}
+
+double getRow2SumQ(ComplexMatrix& rawData, uint64_t number) {
+    double sum = 0.0;
+    for (size_t i = 0; i < rawData.cols; i++) {
+        sum += std::pow(rawData.im[number].at(i), 2);
+    }
+    return sum;
+}
+
+double getRowSumMultIQ(ComplexMatrix& rawData, uint64_t number) {
+    double sum = 0.0;
+    for (size_t i = 0; i < rawData.cols; i++) {
+        sum += rawData.re[number].at(i) * rawData.im[number].at(i);
+    }
+    return sum;
+}
+
 // IQ quadrature departure
 void IQQuadratureDeparture(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
-    std::vector<double> SI;
-    std::vector<double> SQ;
-
-    std::vector<double> SII;
-    std::vector<double> SQQ;
-
-    std::vector<double> SIQ;
-    
     std::vector<double> C;
 
     for (size_t i = 0; i < rawData.rows; i++) {
-        SI.push_back(static_cast<double>(std::accumulate(rawData.re[i].begin(), rawData.re[i].end(), 0)));
-        SQ.push_back(static_cast<double>(std::accumulate(rawData.im[i].begin(), rawData.im[i].end(), 0)));
-    }
-    
-    double tempSum = 0.0;
-
-    for (size_t i = 0; i < rawData.rows; i++) {
-        tempSum = 0.0;
-        for (size_t j = 0; j < rawData.cols; j++) {
-            tempSum += std::pow(rawData.im[i][j], 2);
-        }
-        SQQ.push_back(tempSum - SQ[i] * SQ[i] / rawData.cols);
-    }
-
-    for (size_t i = 0; i < rawData.rows; i++) {
-        tempSum = 0.0;
-        for (size_t j = 0; j < rawData.cols; j++) {
-            tempSum += std::pow(rawData.re[i][j], 2);
-        }
-        SII.push_back(tempSum - SI[i] * SI[i] / rawData.cols);
-    }
-
-    for (size_t i = 0; i < rawData.rows; i++) {
-        tempSum = 0.0;
-        for (size_t j = 0; j < rawData.cols; j++) {
-            tempSum += rawData.re[i][j] * rawData.im[i][j];
-        }
-        SIQ.push_back(tempSum - SI[i] * SQ[i] / rawData.cols);
-    }
-
-    for (size_t i = 0; i < rawData.rows; i++) {
-        C.push_back(SIQ[i] / std::sqrt(SII[i] * SQQ[i]));
+        C.push_back((getRowSumMultIQ(rawData, i) - getRow2SumI(rawData, i) * getRow2SumI(rawData, i) / rawData.cols) /
+            std::sqrt((getRow2SumI(rawData, i) - getRow2SumI(rawData, i) * getRow2SumI(rawData, i) / rawData.cols) *
+                (getRow2SumQ(rawData, i) - getRow2SumQ(rawData, i) * getRow2SumQ(rawData, i) / rawData.cols)));
     }
 
     for (size_t i = 0; i < rawData.rows; i++)
@@ -151,12 +141,52 @@ void IQQuadratureDeparture(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnaly
 
     double sum = std::accumulate(C.begin(), C.end(), 0) / C.size();
     
-    rawDataAnalysis.IQQuadratureDeparture = 0;
+    rawDataAnalysis.IQQuadratureDeparture = std::asin(sum);
     rawDataAnalysis.IQQuadratureDepartureLowerBounds = 0;
     rawDataAnalysis.IQQuadratureDepartureUpperBounds = 0;
 }
 
 // Set the statistics significance flags
+void SetStatisticsSignificanceFlags(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    double k = 1 / static_cast<double>(rawData.rows) * static_cast<double>(rawData.cols);
+    
+    rawDataAnalysis.IBiasSignificanceFlag = 0.0;
+    rawDataAnalysis.IQGainSignificanceFlag = 0.0;
+    rawDataAnalysis.QBiasSignificanceFlag = 0.0;
+}
+
+// Remove constant biases from the I and Q channels. This correction enforces a zero mean to the
+// I and Q components of the signal.
+void CorrectBiases(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    for (size_t i = 0; i < rawData.rows; i++) {
+        std::transform(rawData.re[i].begin(), rawData.re[i].end(), rawData.re[i].begin(), 
+            [rawDataAnalysis](double d) -> double { return d + rawDataAnalysis.meanOfRawDataI; });
+    }
+
+    for (size_t i = 0; i < rawData.rows; i++) {
+        std::transform(rawData.im[i].begin(), rawData.im[i].end(), rawData.re[i].begin(),
+            [rawDataAnalysis](double d) -> double { return d + rawDataAnalysis.meanOfRawDataQ; });
+    }
+}
+
+// Correct for gain imbalance between the I and Q channels.This correction
+// imposes the same standard deviation for the I and Q channels.
+void CorrectGainImbalance(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    for (size_t i = 0; i < rawData.rows; i++) {
+        std::transform(rawData.im[i].begin(), rawData.im[i].end(), rawData.re[i].begin(),
+            [rawDataAnalysis](double d) -> double { return d * rawDataAnalysis.IQGainImbalance; });
+    }
+}
+
+// Correct the Q channel for non - orthogonality
+void CorrectQChannelForNonOrthogonality(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
+    for (size_t i = 0; i < rawData.rows; i++) {
+        for (size_t j = 0; j < rawData.cols; j++)
+        {
+            rawData.im[i][j] = rawData.im[i][j] / cos(rawDataAnalysis.IQQuadratureDeparture) - rawData.re[i][j] * std::tan(rawDataAnalysis.IQQuadratureDeparture);
+        }
+    }
+}
 
 constexpr double speedOfLight = 299792458.0;
 
@@ -175,7 +205,10 @@ T EffectiveRadarVelocity() {
     return static_cast <typeid(T).name()>(0);
 }
 
-template<typename T>
+int azimuthCompression(ComplexMatrix& rawData) {
+    return 0;
+}
+
 int rangeCompression(ComplexMatrix &rawData, bool calcIfft = true) {
     Ipp32fc* data_ref = nullptr;
     Ipp32fc* correl = nullptr;
@@ -727,6 +760,169 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
             //cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
         }
     }; 
+}
+
+int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
+    int NW = (10 * NQ) / 16 * 2;
+    short res;
+    int pos = 0, sign, index = 0;
+    printf("\nNQ=%d -> NW=%d\n", NQ, NW);
+    while (index < (NQ)) {
+        if (index < NQ) {
+            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) {
+                res = -res;
+                printf("%03d\t", res);
+            }
+            IE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) {
+                res = -res;
+            }
+            IE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) pos += 5;
+    }
+    index = 0;
+    pos = NW + 2; 
+    while (index < (NQ)) {
+        if (index < NQ) {
+            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) {
+            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            IO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) pos += 5;
+    }
+    printf("\npos=%d index=%d nw=%d\n", pos, index, (2 * NW + 2));
+    index = 0;
+    pos = 2 * (NW + 2); 
+    while (index < (NQ)) {
+        if (index < NQ) {
+            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
+            sign = (res & 0x200); 
+            res = res & (0x1ff); 
+            if (sign > 0) 
+                res = -res; // printf("%03d\t",res);
+            QE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QE[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) pos += 5;
+    }
+    index = 0;
+    pos = 3 * (NW + 2); // next short
+    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
+    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ)
+        {
+            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
+            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
+            QO[index] = (float)res;
+            index++;
+        }
+        if (index < NQ) pos += 5;
+    }
+    printf("\npos=%d index=%d\n", pos, index);
+    pos = 4 * (NW + 2); // next short
+    return(pos);
 }
 
 int next_bit(unsigned char* p, int* cposition, int* bposition)

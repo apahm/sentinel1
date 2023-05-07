@@ -451,6 +451,42 @@ struct Sentinel1RawPacket {
     uint16_t NumberOfQuads;
 };
 
+struct PositionVelocityTime {
+    double XAxisPositionECEF = 0.0;
+    double YAxisPositionECEF = 0.0;
+    double ZAxisPositionECEF = 0.0;
+    double XvelocityECEF = 0.0;
+    double YvelocityECEF = 0.0;
+    double ZvelocityECEF = 0.0;
+    uint16_t DataStampOne = 0;
+    uint16_t DataStampTwo = 0;
+    uint16_t DataStampThree = 0;
+    uint16_t DataStampFour = 0;
+};
+
+/*
+* The reference frames for the S / C Attitude Quaternions and the S / C angular rates as given in[NRD 02] are as
+follows : 
+1) the S / C Attitude Quaternions represent the S / C attitude in the ECI – J2000 Reference Frame. Q0 is the real 
+component and Q1, Q2, Q3 are the vector components of the Attitude Quaternion.
+2) the S / C inertial angular rate vector is measured in the Body Fixed Reference Frame.
+*/
+
+struct Attitude {
+    float Q0AttitudeQuaternion = 0.0;
+    float Q1AttitudeQuaternion = 0.0;
+    float Q2AttitudeQuaternion = 0.0;
+    float Q3AttitudeQuaternion = 0.0;
+    float XangularRate = 0.0;
+    float YangularRate = 0.0;
+    float ZangularRate = 0.0;
+    uint16_t DataStampOne = 0;
+    uint16_t DataStampTwo = 0;
+    uint16_t DataStampThree = 0;
+    uint16_t DataStampFour = 0;
+    uint16_t PointingStatus = 0;
+};
+
 float calcRxGain(uint8_t rawRxGain) {
     return -(static_cast<float>(rawRxGain) * 0.5);
 }
@@ -753,176 +789,22 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.NumberOfQuads), sizeof(sentinelOneParam.NumberOfQuads));
         sentinelOneParam.NumberOfQuads = _byteswap_ushort(sentinelOneParam.NumberOfQuads);
 
-        if ((sentinelOneParam.BAQMode == BAQMode::BypassMode) && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
-            //cposition = bypass(user, NQ, IE, IO, QE, QO);
+        if (static_cast<int>(sentinelOneParam.SignalType) > 7) {
+            if (static_cast<int>(sentinelOneParam.BAQMode) != 0) {
+                std::cerr << "Calibration data(SIGTYPcode > 7, all CALTYPcode) are only with BAQMODcode = 0";
+            }
         }
+        if (static_cast<int>(sentinelOneParam.SignalType) == 1) {
+            if (static_cast<int>(sentinelOneParam.BAQMode) != 0 && static_cast<int>(sentinelOneParam.BAQMode) != 3
+                && static_cast<int>(sentinelOneParam.BAQMode) != 4 && static_cast<int>(sentinelOneParam.BAQMode) != 5) {
+                std::cerr << "Noise data (SIGTYPcode =1) are only with BAQMODcode =0 or 3 or 4 or 5 ";
+            }
+        }
+
         if ((sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) && (sentinelOneParam.CalType == CalType::TxCal)) {
             //cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
         }
     }; 
-}
-
-int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
-    int NW = (10 * NQ) / 16 * 2;
-    short res;
-    int pos = 0, sign, index = 0;
-    printf("\nNQ=%d -> NW=%d\n", NQ, NW);
-    while (index < (NQ)) {
-        if (index < NQ) {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) {
-                res = -res;
-                printf("%03d\t", res);
-            }
-            IE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) {
-                res = -res;
-            }
-            IE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    index = 0;
-    pos = NW + 2; 
-    while (index < (NQ)) {
-        if (index < NQ) {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            IO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    printf("\npos=%d index=%d nw=%d\n", pos, index, (2 * NW + 2));
-    index = 0;
-    pos = 2 * (NW + 2); 
-    while (index < (NQ)) {
-        if (index < NQ) {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); 
-            res = res & (0x1ff); 
-            if (sign > 0) 
-                res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QE[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    index = 0;
-    pos = 3 * (NW + 2); // next short
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ)
-        {
-            res = (short)(p[pos + 3] & 0x03) * 4 * 4 * 4 * 4 + (short)(p[pos + 4]);    // printf("%hx=",res);   
-            sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
-            QO[index] = (float)res;
-            index++;
-        }
-        if (index < NQ) pos += 5;
-    }
-    printf("\npos=%d index=%d\n", pos, index);
-    pos = 4 * (NW + 2); // next short
-    return(pos);
 }
 
 int next_bit(unsigned char* p, int* cposition, int* bposition)
@@ -952,7 +834,7 @@ struct sh_code {
     int mcode; 
 };
 
-static struct sh_code BRC4Func(unsigned char* p, int* cposition, int* bposition) // TODO: never tested !
+struct sh_code BRC4Func(unsigned char* p, int* cposition, int* bposition) // TODO: never tested !
 {
     int hcode, sign;
     struct sh_code sol;
@@ -1310,7 +1192,7 @@ int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, flo
 }
 
 int main() {
-    ReadSARParam("C:/Houston/S1A_S1_RAW__0SDV_20230424T123129_20230424T123155_048238_05CCE5_9C36/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
+    ReadSARParam("C:/Houston/s1a-s1-raw-s-vh-20230424t123129-20230424t123155-048238-05cce5.dat");
 
     return 0;
 }

@@ -132,9 +132,9 @@ struct PositionVelocityTime {
     double XAxisPositionECEF = 0.0;
     double YAxisPositionECEF = 0.0;
     double ZAxisPositionECEF = 0.0;
-    double XvelocityECEF = 0.0;
-    double YvelocityECEF = 0.0;
-    double ZvelocityECEF = 0.0;
+    float XvelocityECEF = 0.0;
+    float YvelocityECEF = 0.0;
+    float ZvelocityECEF = 0.0;
     uint16_t DataStampOne = 0;
     uint16_t DataStampTwo = 0;
     uint16_t DataStampThree = 0;
@@ -839,7 +839,7 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         }
 
         if ((sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) && (sentinelOneParam.CalType == CalType::TxCal)) {
-            //cposition = packet_decode(user, NQ, IE, IO, QE, QO, brc, &brcpos);
+        
         }
 
         sentinel1PacketDecode.header.emplace_back(sentinelOneParam);
@@ -852,64 +852,64 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
 
     for (size_t i = 0; i < sentinel1PacketDecode.header.size(); i++) {
         if (sentinel1PacketDecode.header.at(i).WordIndex == 1) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 2) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 3) {
-            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 4) {
-            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.XAxisPositionECEF, tmp, sizeof(tmp));
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.XAxisPositionECEF, tmp, sizeof(double));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 5) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 6) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 7) {
-            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 8) {
-            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.YAxisPositionECEF, tmp, sizeof(tmp));
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.YAxisPositionECEF, tmp, sizeof(double));
         }
         if (sentinel1PacketDecode.header.at(i).WordIndex == 9) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 10) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-        }
-        else if (sentinel1PacketDecode.header.at(i).WordIndex == 11) {
             tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
         }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 11) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 12) {
-            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.ZAxisPositionECEF, tmp, sizeof(tmp));
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.ZAxisPositionECEF, tmp, sizeof(double));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 13) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 14) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.XvelocityECEF, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.XvelocityECEF, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 15) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 16) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.YvelocityECEF, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.YvelocityECEF, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 17) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 18) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&pvt.ZvelocityECEF, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.ZvelocityECEF, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 19) {
             pvt.DataStampOne = sentinel1PacketDecode.header.at(i).WordVal;
@@ -924,53 +924,53 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
             pvt.DataStampFour = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 23) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 24) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.Q0AttitudeQuaternion, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q0AttitudeQuaternion, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 25) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 26) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.Q1AttitudeQuaternion, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q1AttitudeQuaternion, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 27) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 28) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.Q2AttitudeQuaternion, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q2AttitudeQuaternion, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 29) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 30) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.Q3AttitudeQuaternion, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q3AttitudeQuaternion, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 31) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 32) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.XangularRate, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.XangularRate, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 33) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 34) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.YangularRate, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.YangularRate, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 35) {
-            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 36) {
-            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
-            std::memcpy(&att.ZangularRate, tmp, 2);
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.ZangularRate, tmp, sizeof(float));
         }
         else if (sentinel1PacketDecode.header.at(i).WordIndex == 37) {
             att.DataStampOne = sentinel1PacketDecode.header.at(i).WordVal;
@@ -990,7 +990,6 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
             sentinel1PacketDecode.attitude.emplace_back(att);
         }
     }
-    
 }
 
 int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
@@ -998,24 +997,20 @@ int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO)
     short res;
     int pos = 0, sign, index = 0;
     printf("\nNQ=%d -> NW=%d\n", NQ, NW);
-    while (index < (NQ))  // 8*5=40 : 4 10=bit values for 5 bytes
-    {// printf("%02hhx %02hhx %02hhx %02hhx %02hhx = ",p[pos+0],p[pos+1],p[pos+2],p[pos+3],p[pos+4]);
-        if (index < NQ)
-        {
+    while (index < (NQ)) {
+        if (index < NQ) {
             res = (short)(p[pos + 0] & 0xff) * 4 + (short)(p[pos + 1] >> 6);       // printf("%hx=",res);   
             sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
             IE[index] = (float)res;
             index++;
         }
-        if (index < NQ)
-        {
+        if (index < NQ) {
             res = (short)(p[pos + 1] & 0x3f) * 4 * 4 + (short)(p[pos + 2] >> 4);     // printf("%hx=",res);   
             sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
             IE[index] = (float)res;
             index++;
         }
-        if (index < NQ)
-        {
+        if (index < NQ) {
             res = (short)(p[pos + 2] & 0x0f) * 4 * 4 * 4 + (short)(p[pos + 3] >> 2);   // printf("%hx=",res);   
             sign = (res & 0x200); res = res & (0x1ff); if (sign > 0) res = -res; // printf("%03d\t",res);
             IE[index] = (float)res;

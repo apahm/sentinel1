@@ -8,6 +8,8 @@
 #include <bitset>
 #include <algorithm>
 #include <numeric>
+#include <cstdint>
+#include <cstring>
 
 enum class ECCNumber {
     Stripmap1 = 1,
@@ -261,6 +263,8 @@ struct ComplexMatrix {
 
 struct Sentinel1PacketDecode {
     std::vector<Sentinel1RawPacket> header;
+    std::vector<PositionVelocityTime> positionVelocityTime;
+    std::vector<Attitude> attitude;
 };
 
 void MeanOfRawData(ComplexMatrix &rawData, RawDataAnalysis& rawDataAnalysis) {
@@ -841,11 +845,155 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
         sentinel1PacketDecode.header.emplace_back(sentinelOneParam);
     }; 
 
-    bool f = true;
+    PositionVelocityTime pvt;
+    Attitude att;
+
+    uint16_t tmp[4] = { 0, 0, 0, 0 };
+
+    for (size_t i = 0; i < sentinel1PacketDecode.header.size(); i++) {
+        if (sentinel1PacketDecode.header.at(i).WordIndex == 1) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 2) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 3) {
+            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 4) {
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.XAxisPositionECEF, tmp, sizeof(tmp));
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 5) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 6) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 7) {
+            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 8) {
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.YAxisPositionECEF, tmp, sizeof(tmp));
+        }
+        if (sentinel1PacketDecode.header.at(i).WordIndex == 9) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 10) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 11) {
+            tmp[2] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 12) {
+            tmp[3] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.ZAxisPositionECEF, tmp, sizeof(tmp));
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 13) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 14) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.XvelocityECEF, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 15) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 16) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.YvelocityECEF, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 17) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 18) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&pvt.ZvelocityECEF, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 19) {
+            pvt.DataStampOne = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 20) {
+            pvt.DataStampTwo = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 21) {
+            pvt.DataStampThree = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 22) {
+            pvt.DataStampFour = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 23) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 24) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q0AttitudeQuaternion, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 25) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 26) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q1AttitudeQuaternion, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 27) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 28) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q2AttitudeQuaternion, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 29) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 30) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.Q3AttitudeQuaternion, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 31) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 32) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.XangularRate, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 33) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 34) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.YangularRate, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 35) {
+            tmp[0] = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 36) {
+            tmp[1] = sentinel1PacketDecode.header.at(i).WordVal;
+            std::memcpy(&att.ZangularRate, tmp, 2);
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 37) {
+            att.DataStampOne = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 38) {
+            att.DataStampTwo = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 39) {
+            att.DataStampThree = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 40) {
+            att.DataStampFour = sentinel1PacketDecode.header.at(i).WordVal;
+        }
+        else if (sentinel1PacketDecode.header.at(i).WordIndex == 41) {
+            //sentinel1PacketDecode.header.at(i).WordVal;
+            sentinel1PacketDecode.positionVelocityTime.emplace_back(pvt);
+            sentinel1PacketDecode.attitude.emplace_back(att);
+        }
+    }
+    
 }
 
-int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) // bypass
-{
+int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
     int NW = (10 * NQ) / 16 * 2;
     short res;
     int pos = 0, sign, index = 0;

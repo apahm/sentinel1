@@ -990,6 +990,15 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
             sentinel1PacketDecode.attitude.emplace_back(att);
         }
     }
+    bool f = false;
+}
+
+float getNormSateliteVelocity(Sentinel1PacketDecode &sentinel1PacketDecode) {
+    return 0.0;
+}
+
+float getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDecode) {
+    return 0.0;
 }
 
 int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {

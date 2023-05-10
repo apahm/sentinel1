@@ -648,6 +648,16 @@ txprr_	-2869
 txpsf	43.8013
 */
 
+float getNormSateliteVelocity(Sentinel1PacketDecode& sentinel1PacketDecode, uint64_t numberOfNavigPacket) {
+    return std::sqrt(std::pow(sentinel1PacketDecode.positionVelocityTime.at(numberOfNavigPacket).XvelocityECEF, 2) +
+        std::pow(sentinel1PacketDecode.positionVelocityTime.at(numberOfNavigPacket).YvelocityECEF, 2) +
+        std::pow(sentinel1PacketDecode.positionVelocityTime.at(numberOfNavigPacket).ZvelocityECEF, 2));
+}
+
+float getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDecode) {
+    return 0.0;
+}
+
 int ReadSARParam(std::filesystem::path pathToRawData) {
     uint8_t tmp8 = 0;
     uint16_t tmp16 = 0;
@@ -990,16 +1000,12 @@ int ReadSARParam(std::filesystem::path pathToRawData) {
             sentinel1PacketDecode.attitude.emplace_back(att);
         }
     }
-    bool f = false;
+    for (size_t i = 0; i < sentinel1PacketDecode.positionVelocityTime.size(); i++) {
+        std::cout << getNormSateliteVelocity(sentinel1PacketDecode, i) << std::endl;
+    }
 }
 
-float getNormSateliteVelocity(Sentinel1PacketDecode &sentinel1PacketDecode) {
-    return 0.0;
-}
 
-float getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDecode) {
-    return 0.0;
-}
 
 int bypass(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
     int NW = (10 * NQ) / 16 * 2;

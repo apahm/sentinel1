@@ -48,6 +48,10 @@ target_compile_definitions(KeysightTechnologiesControl PRIVATE
 
 target_sources(KeysightTechnologiesControl PRIVATE
     src/main.cpp
+    src/sentinel1_packet_decode.h
+    src/sentinel1_packet_decode.cpp
+    src/sentinel1.h
+    src/sentinel1.cpp
 )
 
 target_include_directories(KeysightTechnologiesControl PRIVATE  

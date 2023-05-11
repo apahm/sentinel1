@@ -2,8 +2,6 @@
 #include <intrin.h>
 #include <bitset>
 
-
-
 Sentinel1PacketDecode::Sentinel1PacketDecode()
 {
 

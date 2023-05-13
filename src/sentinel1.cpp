@@ -41,7 +41,7 @@ float Sentinel::getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDeco
     float satelitePosition = getNormSatelitePosition(sentinel1PacketDecode, 0);
 
     float groundVelocity = 0.0;
-
+    
     double lat = std::atan(sentinel1PacketDecode.positionVelocityTime.at(0).ZAxisPositionECEF /
         sentinel1PacketDecode.positionVelocityTime.at(0).XAxisPositionECEF);
 

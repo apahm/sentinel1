@@ -72,12 +72,17 @@ public:
 private:
     const double speedOfLight = 299792458.0;
     double rangeStartTime = 0.0;
-    double suppressedDataTime = 0.0;
     double wavelength = speedOfLight / 5.405e9;
     double rangeSampleFreq = 0.0;
     double rangeSamplePeriod = 0.0;
     double azSampleFreq = 0.0;
     double azSamplePeriod = 0.0;
+    std::vector<float> fastTime;
+    std::vector<float> slantRange;
+    std::vector<float> azimuthFreq;
+    std::vector<float> rangeFreq;
+    std::vector<float> migrationFactor;
+    Sentinel1PacketDecode sentinel1PacketDecode;
 };
 
 

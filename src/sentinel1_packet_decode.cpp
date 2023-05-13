@@ -454,3 +454,352 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
         }
     }
 }
+
+void Sentinel1PacketDecode::reconstruction(unsigned char* BRCn, unsigned char* THIDXn, ShCode* hcode, int NQ, float* result)
+{
+    int hcode_index = 0, h;
+    int BRCindex = 0;
+    int inc = 128;
+    do
+    {
+        if ((hcode_index + 128) > NQ) {
+            inc = (NQ - hcode_index);                      
+        }
+
+        for (h = 0; h < inc; h++) {
+            switch (BRCn[BRCindex]) {
+            case 0:
+                if (THIDXn[BRCindex] <= 3) {
+                    if (hcode[hcode_index].mcode < 3) {
+                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
+                    }
+                    else if (hcode[hcode_index].mcode == 3) {
+                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC0[THIDXn[BRCindex]];
+                    }
+                }
+                else {
+                    result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL0[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
+                }
+                break;
+            case 1:
+                if (THIDXn[BRCindex] <= 3)
+                {
+                    if (hcode[hcode_index].mcode < 4)
+                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
+                    else
+                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC1[THIDXn[BRCindex]];
+                }
+                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL1[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
+                break;
+            case 2:
+                if (THIDXn[BRCindex] <= 5)
+                {
+                    if (hcode[hcode_index].mcode < 6)
+                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
+                    else
+                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC2[THIDXn[BRCindex]];
+                }
+                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL2[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
+                break;
+            case 3:
+                if (THIDXn[BRCindex] <= 6)
+                {
+                    if (hcode[hcode_index].mcode < 9)
+                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
+                    else
+                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC3[THIDXn[BRCindex]];
+                }
+                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL3[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
+                break;
+            case 4:
+                if (THIDXn[BRCindex] <= 8)
+                {
+                    if (hcode[hcode_index].mcode < 15)
+                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
+                    else
+                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC4[THIDXn[BRCindex]];
+                }
+                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL4[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
+                break;
+            default: 
+                printf("UNHANDLED CASE\n"); 
+                exit(-1);
+            }
+            hcode_index++;
+        }
+        BRCindex++;
+    } while (hcode_index < NQ);
+}
+
+int Sentinel1PacketDecode::next_bit(unsigned char* p, int* cposition, int* bposition)
+{
+    int bit = ((p[*cposition] >> (*bposition)) & 1);
+    (*bposition)--;
+    if ((*bposition) < 0) { (*cposition)++; (*bposition) = 7; }
+    return bit;
+}
+
+unsigned char Sentinel1PacketDecode::get_THIDX(unsigned char* p, int* cposition, int* bposition)
+{
+    int res = 0;
+    int k;
+    for (k = 0; k < 8; k++)
+    {
+        res = res << 1;
+        res += next_bit(p, cposition, bposition);
+    }
+    return(res);
+}
+
+ShCode Sentinel1PacketDecode::BRC4(unsigned char* p, int* cposition, int* bposition)
+{
+    int hcode, sign;
+    ShCode sol;
+    int b;
+    sign = next_bit(p, cposition, bposition);
+    if (sign == 0) sol.sign = 1; else sol.sign = -1;
+    hcode = 0;
+    do {
+        b = next_bit(p, cposition, bposition);
+        switch (hcode)
+        {
+        case 5:
+            if (b == 0) // must be BEFORE hcode=5 at bottom
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0) { sol.mcode = 5; return(sol); }  // BRC4,1100
+                else { sol.mcode = 6; return(sol); }  // BRC4,1101
+            }
+            else hcode = 6;
+            break;
+        case 6:
+        case 7:
+        case 8:
+            if (b == 0) { sol.mcode = hcode + 1; return(sol); }
+            else hcode++;
+            break;
+        case 9:
+            if (b == 0)
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0) { sol.mcode = 10; return(sol); } // BRC4,11111100
+                else { sol.mcode = 11; return(sol); } // BRC4,11111101
+            }
+            else hcode++;
+            break;
+        case 10:
+            if (b == 0)
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0) { sol.mcode = 12; return(sol); } // BRC4,111111100
+                else { sol.mcode = 13; return(sol); } // BRC4,111111101
+            }
+            else
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0) { sol.mcode = 14; return(sol); } // BRC4,111111100
+                else { sol.mcode = 15; return(sol); } // BRC4,111111101
+            }
+            break;
+        case 0:
+            if (b == 0)   // first 0
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0) { sol.mcode = 0; return(sol); }  // BRC4,00 
+                else
+                {
+                    b = next_bit(p, cposition, bposition);
+                    if (b == 0) { sol.mcode = 1; return(sol); } // BRC4,010
+                    else { sol.mcode = 2; return(sol); } // BRC4,011
+                }
+            }
+            else
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0)  // BRC4,00 
+                {
+                    b = next_bit(p, cposition, bposition);
+                    if (b == 0) { sol.mcode = 3; return(sol); } // BRC4,100
+                    else { sol.mcode = 4; return(sol); } // BRC4,101
+                }
+                else hcode = 5;
+            }
+            break;
+        }
+    } while (hcode <= 15);
+    sol.mcode = 999;
+    exit(-1);    // should never get here
+    return(sol);
+}
+
+ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, int* bposition)
+{
+    int hcode;
+    int sign;
+    int b;
+    struct ShCode sol;
+    switch (BRCn) {
+    case 0: 
+        BRCn = 3; 
+        break; // number of steps to reach the leaves BRC0
+    case 1: 
+        BRCn = 4; 
+        break; // number of steps to reach the leaves BRC1
+    case 2: 
+        BRCn = 6; 
+        break; // number of steps to reach the leaves BRC2
+    case 3: 
+        BRCn = 9; 
+        break; // number of steps to reach the leaves BRC3
+    case 4: 
+        return(BRC4(p, cposition, bposition)); 
+        printf("\nCheck if BRC4 output is correct\n"); 
+        exit(0); 
+        break;
+    default: 
+        printf("ERROR"); 
+        exit(-1);
+    }
+    sign = next_bit(p, cposition, bposition);
+    if (sign == 0) sol.sign = 1; else sol.sign = -1;
+    hcode = 0;
+    do {
+        b = next_bit(p, cposition, bposition);
+        if (b == 0)                                   // 0: end of tree
+            if ((BRCn == 9) && (hcode == 0))             // first 0 (hcode==0) of BRC3
+            {
+                b = next_bit(p, cposition, bposition);
+                if (b == 0)
+                {
+                    sol.mcode = hcode; return(sol);
+                }     // we reached 00 of BRC3
+                else
+                {
+                    sol.mcode = hcode + 1; return(sol);
+                }   // we reached 01 of BRC3
+            }
+            else
+            {
+                sol.mcode = hcode; return(sol);
+            }         // we reached 0 -> return
+        else
+        {
+            hcode++;                                // 1: continue
+            if ((BRCn == 9) && (hcode == 1)) hcode++;
+            if (hcode == BRCn)                        // unless last 1 was reached 
+            {
+                sol.mcode = hcode; return(sol);
+            }       // end of tree reached
+        }
+    } while (hcode < BRCn);
+    exit(-1);                                     // ERROR in decoding Huffman
+    sol.mcode = 99;
+    return(sol);                                  // should never be reached
+}
+
+int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos) {
+    // IE 1st 3 bits = BRC
+    // QE first 8 bits = THIDX
+    ShCode hcodeIE[52378];
+    ShCode hcodeIO[52378];
+    ShCode hcodeQE[52378];
+    ShCode hcodeQO[52378];
+    unsigned char BRCn[410];   // max value p.55: 52378/128=409.2
+    unsigned char THIDXn[410];
+    int BRCindex;
+    int h, hcode_index;
+    int cposition = 0, bposition = 7;
+    int inc = 128;  // 128 samples until NQ is reached
+    BRCindex = 0;
+    hcode_index = 0;
+    do {
+        BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
+        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
+        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
+        brc[*brcpos] = BRCn[BRCindex];
+        (*brcpos)++;
+        if ((hcode_index + 128) > NQ) {
+            inc = (NQ - hcode_index);      // smaller increment to match NQ
+        }
+        for (h = 0; h < inc; h++) {
+            hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+            hcode_index++;
+        }
+        BRCindex++;
+    } while (hcode_index < NQ);
+    
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }        // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
+        {
+            hcodeIO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+      //      msg("%d",hcodeIO[hcode_index]);
+            hcode_index++;
+        }
+        BRCindex++;
+    } while (hcode_index < NQ);
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }     // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        THIDXn[BRCindex] = get_THIDX(p, &cposition, &bposition);
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) // p.68: 128 HCodes
+        {
+            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+            hcode_index++;
+        }
+        BRCindex++;
+    } while (hcode_index < NQ);
+    inc = 128;
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }     // odd address => +1 
+    BRCindex = 0;
+    hcode_index = 0;
+    do
+    {
+        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
+        for (h = 0; h < inc; h++) {
+            hcodeQO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
+            hcode_index++;
+        }
+        BRCindex++;
+    } while (hcode_index < NQ);
+    if (bposition != 7) { 
+        bposition = 7; 
+        cposition++; 
+    } // start at new position
+    if ((cposition & 1) != 0) { 
+        cposition++; 
+    }  // odd address => +1 
+    reconstruction(BRCn, THIDXn, hcodeIE, NQ, IE);
+    reconstruction(BRCn, THIDXn, hcodeIO, NQ, IO);
+    reconstruction(BRCn, THIDXn, hcodeQE, NQ, QE);
+    reconstruction(BRCn, THIDXn, hcodeQO, NQ, QO);
+    return(cposition);
+}
+

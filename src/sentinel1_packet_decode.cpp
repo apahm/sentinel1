@@ -3,7 +3,6 @@
 #include <bitset>
 
 Sentinel1PacketDecode::Sentinel1PacketDecode() {
-    //matrix.resize(16000, 500);
 
 }
 
@@ -116,6 +115,7 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
     uint8_t tmp8 = 0;
     uint16_t tmp16 = 0;
     uint32_t tmp32 = 0;
+        int i = 0, j = 0;
 
     std::ifstream rawData(pathToRawData, std::ios::binary);
     if (!rawData.is_open()) {
@@ -257,8 +257,8 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
         else {
             // Octet 60
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-            sentinelOneParam.SASTestMode = std::bitset<8>(tmp8)[0];
-            sentinelOneParam.CalType = static_cast<CalType>(tmp8 & 0x0E);
+            sentinelOneParam.SASTestMode = std::bitset<8>(tmp8)[7];
+            sentinelOneParam.CalType = static_cast<CalType>(tmp8 >> 4 & 0x7);
             tmp16 = tmp8 & 0xC0;
             // Octet 61
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
@@ -296,12 +296,15 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
             rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
         }
 
-        if (sentinelOneParam.BAQMode == BAQMode::BypassMode && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
 
+        if (sentinelOneParam.BAQMode == BAQMode::BypassMode && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
         }
 
-        if ((sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) && (sentinelOneParam.CalType == CalType::TxCal)) {
-
+        if (sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) {
+            if (sentinelOneParam.SignalType == SignalType::Echo) {
+                j += 1;
+            }
+            i += 1;
         }
 
         header.emplace_back(sentinelOneParam);
@@ -697,18 +700,20 @@ ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, in
 }
 
 int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos) {
-    // IE 1st 3 bits = BRC
-    // QE first 8 bits = THIDX
-    ShCode hcodeIE[52378];
-    ShCode hcodeIO[52378];
-    ShCode hcodeQE[52378];
-    ShCode hcodeQO[52378];
-    unsigned char BRCn[410];   // max value p.55: 52378/128=409.2
-    unsigned char THIDXn[410];
+
+    std::vector<ShCode> hcodeIE(52378);
+    std::vector<ShCode> hcodeIO(52378);
+    std::vector<ShCode> hcodeQE(52378);
+    std::vector<ShCode> hcodeQO(52378);
+    std::vector<uint8_t> BRCn(410);
+    std::vector<uint8_t> THIDXn(410);
+
     int BRCindex;
-    int h, hcode_index;
-    int cposition = 0, bposition = 7;
-    int inc = 128;  // 128 samples until NQ is reached
+    int h;
+    int hcode_index;
+    int cposition = 0;
+    int bposition = 7;
+    int inc = 128;  
     BRCindex = 0;
     hcode_index = 0;
     do {
@@ -718,7 +723,7 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
         brc[*brcpos] = BRCn[BRCindex];
         (*brcpos)++;
         if ((hcode_index + 128) > NQ) {
-            inc = (NQ - hcode_index);      // smaller increment to match NQ
+            inc = (NQ - hcode_index);      
         }
         for (h = 0; h < inc; h++) {
             hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
@@ -731,10 +736,11 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
     if (bposition != 7) { 
         bposition = 7; 
         cposition++; 
-    } // start at new position
+    } 
+    
     if ((cposition & 1) != 0) { 
         cposition++; 
-    }        // odd address => +1 
+    }        
     BRCindex = 0;
     hcode_index = 0;
     do
@@ -743,7 +749,6 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
         for (h = 0; h < inc; h++) // p.68: 128 HCodes
         {
             hcodeIO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-      //      msg("%d",hcodeIO[hcode_index]);
             hcode_index++;
         }
         BRCindex++;
@@ -752,10 +757,10 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
     if (bposition != 7) { 
         bposition = 7; 
         cposition++; 
-    } // start at new position
+    } 
     if ((cposition & 1) != 0) { 
         cposition++; 
-    }     // odd address => +1 
+    } 
     BRCindex = 0;
     hcode_index = 0;
     do
@@ -795,10 +800,10 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
     if ((cposition & 1) != 0) { 
         cposition++; 
     }  // odd address => +1 
-    reconstruction(BRCn, THIDXn, hcodeIE, NQ, IE);
-    reconstruction(BRCn, THIDXn, hcodeIO, NQ, IO);
-    reconstruction(BRCn, THIDXn, hcodeQE, NQ, QE);
-    reconstruction(BRCn, THIDXn, hcodeQO, NQ, QO);
+    reconstruction(BRCn.data(), THIDXn.data(), hcodeIE.data(), NQ, IE);
+    reconstruction(BRCn.data(), THIDXn.data(), hcodeIO.data(), NQ, IO);
+    reconstruction(BRCn.data(), THIDXn.data(), hcodeQE.data(), NQ, QE);
+    reconstruction(BRCn.data(), THIDXn.data(), hcodeQO.data(), NQ, QO);
     return(cposition);
 }
 

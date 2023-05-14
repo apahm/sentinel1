@@ -281,8 +281,7 @@ public:
     std::vector<PositionVelocityTime> positionVelocityTime;
     std::vector<Attitude> attitude;
 
-    std::vector<uint8_t> bitRateCode;
-    std::vector<uint8_t> THIDXn;
+
 
     float BRC0[4] = { 3.,3.,3.16,3.53 };
     float BRC1[4] = { 4.,4.,4.08,4.37 };

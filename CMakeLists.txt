@@ -31,8 +31,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(KeysightTechnologiesControl src/main.cpp)
 
-add_subdirectory(eigen)
-
 if(MSVC)
     target_compile_options(KeysightTechnologiesControl PRIVATE "/MP")
 endif()

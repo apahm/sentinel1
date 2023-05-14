@@ -2,13 +2,11 @@
 #include <intrin.h>
 #include <bitset>
 
-Sentinel1PacketDecode::Sentinel1PacketDecode()
-{
-
+Sentinel1PacketDecode::Sentinel1PacketDecode() {
+    //matrix.resize(16000, 500);
 }
 
-Sentinel1PacketDecode::~Sentinel1PacketDecode()
-{
+Sentinel1PacketDecode::~Sentinel1PacketDecode() {
 
 }
 
@@ -551,7 +549,7 @@ unsigned char Sentinel1PacketDecode::get_THIDX(unsigned char* p, int* cposition,
     return(res);
 }
 
-ShCode Sentinel1PacketDecode::BRC4(unsigned char* p, int* cposition, int* bposition)
+ShCode Sentinel1PacketDecode::BRC_4(unsigned char* p, int* cposition, int* bposition)
 {
     int hcode, sign;
     ShCode sol;
@@ -652,7 +650,7 @@ ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, in
         BRCn = 9; 
         break; // number of steps to reach the leaves BRC3
     case 4: 
-        return(BRC4(p, cposition, bposition)); 
+        return(BRC_4(p, cposition, bposition));
         printf("\nCheck if BRC4 output is correct\n"); 
         exit(0); 
         break;

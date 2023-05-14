@@ -5,6 +5,7 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
+#include "../Eigen/Dense"
 
 enum class ECCNumber {
     Stripmap1 = 1,
@@ -275,11 +276,13 @@ public:
     unsigned char get_THIDX(unsigned char* p, int* cposition, int* bposition);
     int next_bit(unsigned char* p, int* cposition, int* bposition);
     ShCode BRC(int BRCn, unsigned char* p, int* cposition, int* bposition);
-    ShCode BRC4(unsigned char* p, int* cposition, int* bposition);
+    ShCode BRC_4(unsigned char* p, int* cposition, int* bposition);
 
     std::vector<Sentinel1RawPacket> header;
     std::vector<PositionVelocityTime> positionVelocityTime;
     std::vector<Attitude> attitude;
+
+    Eigen::MatrixXd matrix;
 
     float BRC0[4] = { 3.,3.,3.16,3.53 };
     float BRC1[4] = { 4.,4.,4.08,4.37 };

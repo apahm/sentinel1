@@ -271,7 +271,7 @@ public:
     uint32_t read24Bit(std::ifstream& f);
     int ReadSARParam(std::filesystem::path pathToRawData);
     void reconstruction(unsigned char* BRCn, unsigned char* THIDXn, ShCode* hcode, int NQ, float* result);
-    int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos);
+    int packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO);
     unsigned char get_THIDX(unsigned char* p, int* cposition, int* bposition);
     int next_bit(unsigned char* p, int* cposition, int* bposition);
     ShCode BRC(int BRCn, unsigned char* p, int* cposition, int* bposition);

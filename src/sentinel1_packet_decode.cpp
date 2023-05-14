@@ -457,8 +457,7 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
     }
 }
 
-void Sentinel1PacketDecode::reconstruction(unsigned char* BRCn, unsigned char* THIDXn, ShCode* hcode, int NQ, float* result)
-{
+void Sentinel1PacketDecode::reconstruction(unsigned char* BRCn, unsigned char* THIDXn, ShCode* hcode, int NQ, float* result) {
     int hcode_index = 0, h;
     int BRCindex = 0;
     int inc = 128;
@@ -634,73 +633,75 @@ ShCode Sentinel1PacketDecode::BRC_4(unsigned char* p, int* cposition, int* bposi
     return(sol);
 }
 
-ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, int* bposition)
-{
+ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, int* bposition) {
     int hcode;
     int sign;
     int b;
     struct ShCode sol;
     switch (BRCn) {
-    case 0: 
-        BRCn = 3; 
-        break; // number of steps to reach the leaves BRC0
-    case 1: 
-        BRCn = 4; 
-        break; // number of steps to reach the leaves BRC1
-    case 2: 
-        BRCn = 6; 
-        break; // number of steps to reach the leaves BRC2
-    case 3: 
-        BRCn = 9; 
-        break; // number of steps to reach the leaves BRC3
-    case 4: 
-        return(BRC_4(p, cposition, bposition));
-        printf("\nCheck if BRC4 output is correct\n"); 
-        exit(0); 
-        break;
-    default: 
-        printf("ERROR"); 
-        exit(-1);
+        case 0: 
+            BRCn = 3; 
+            break; // number of steps to reach the leaves BRC0
+        case 1: 
+            BRCn = 4; 
+            break; // number of steps to reach the leaves BRC1
+        case 2: 
+            BRCn = 6; 
+            break; // number of steps to reach the leaves BRC2
+        case 3: 
+            BRCn = 9; 
+            break; // number of steps to reach the leaves BRC3
+        case 4: 
+            return(BRC_4(p, cposition, bposition));
+            printf("\nCheck if BRC4 output is correct\n"); 
+            break;
+        default: 
+            printf("ERROR"); 
     }
     sign = next_bit(p, cposition, bposition);
-    if (sign == 0) sol.sign = 1; else sol.sign = -1;
+    if (sign == 0) {
+        sol.sign = 1; 
+    }
+    else {
+        sol.sign = -1;
+    }
     hcode = 0;
     do {
         b = next_bit(p, cposition, bposition);
-        if (b == 0)                                   // 0: end of tree
-            if ((BRCn == 9) && (hcode == 0))             // first 0 (hcode==0) of BRC3
-            {
+        if (b == 0) {
+            if ((BRCn == 9) && (hcode == 0)) {
                 b = next_bit(p, cposition, bposition);
-                if (b == 0)
-                {
-                    sol.mcode = hcode; return(sol);
-                }     // we reached 00 of BRC3
-                else
-                {
-                    sol.mcode = hcode + 1; return(sol);
-                }   // we reached 01 of BRC3
+                if (b == 0) {
+                    sol.mcode = hcode;
+                    return(sol);
+                }
+                else {
+                    sol.mcode = hcode + 1;
+                    return(sol);
+                }
             }
-            else
-            {
-                sol.mcode = hcode; return(sol);
-            }         // we reached 0 -> return
-        else
-        {
-            hcode++;                                // 1: continue
-            if ((BRCn == 9) && (hcode == 1)) hcode++;
-            if (hcode == BRCn)                        // unless last 1 was reached 
-            {
-                sol.mcode = hcode; return(sol);
-            }       // end of tree reached
+            else {
+                sol.mcode = hcode;
+                return(sol);
+            }
+        }
+        else {
+            hcode++;                                
+            if ((BRCn == 9) && (hcode == 1)) {
+                hcode++;
+            }
+            if (hcode == BRCn) {
+                sol.mcode = hcode; 
+                return(sol);
+            }      
         }
     } while (hcode < BRCn);
-    exit(-1);                                     // ERROR in decoding Huffman
+    exit(-1);                                     
     sol.mcode = 99;
-    return(sol);                                  // should never be reached
+    return(sol);                                  
 }
 
-int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO, char* brc, int* brcpos) {
-
+int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
     std::vector<ShCode> hcodeIE(52378);
     std::vector<ShCode> hcodeIO(52378);
     std::vector<ShCode> hcodeQE(52378);
@@ -720,8 +721,6 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
         BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
         BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
         BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
-        brc[*brcpos] = BRCn[BRCindex];
-        (*brcpos)++;
         if ((hcode_index + 128) > NQ) {
             inc = (NQ - hcode_index);      
         }
@@ -793,13 +792,15 @@ int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, fl
         }
         BRCindex++;
     } while (hcode_index < NQ);
+
     if (bposition != 7) { 
         bposition = 7; 
         cposition++; 
-    } // start at new position
+    } 
     if ((cposition & 1) != 0) { 
         cposition++; 
-    }  // odd address => +1 
+    } 
+
     reconstruction(BRCn.data(), THIDXn.data(), hcodeIE.data(), NQ, IE);
     reconstruction(BRCn.data(), THIDXn.data(), hcodeIO.data(), NQ, IO);
     reconstruction(BRCn.data(), THIDXn.data(), hcodeQE.data(), NQ, QE);

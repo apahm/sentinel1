@@ -307,11 +307,15 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
 		state._mmap_data = data.data();
 
         if (sentinelOneParam.BAQMode == BAQMode::BypassMode && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
+
         }
 
         if (sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) {
             if (sentinelOneParam.SignalType == SignalType::Echo) {
-				initDecodePacket(output.data(), sentinelOneParam);
+				if (initDecodePacket(output.data(), sentinelOneParam) == 2 * sentinelOneParam.NumberOfQuads) {
+					j += 1;
+				}
+				i += 1;
 			}
         }
 

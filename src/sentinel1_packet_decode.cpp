@@ -1,6 +1,7 @@
 #include "sentinel1_packet_decode.h"
 #include <intrin.h>
 #include <bitset>
+#include <cassert>
 
 Sentinel1PacketDecode::Sentinel1PacketDecode() {
 
@@ -279,6 +280,9 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
         rawData.read(reinterpret_cast<char*>(&sentinelOneParam.NumberOfQuads), sizeof(sentinelOneParam.NumberOfQuads));
         sentinelOneParam.NumberOfQuads = _byteswap_ushort(sentinelOneParam.NumberOfQuads);
 
+		// Octet 67
+		rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
+
         if (static_cast<int>(sentinelOneParam.SignalType) > 7) {
             if (static_cast<int>(sentinelOneParam.BAQMode) != 0) {
                 std::cerr << "Calibration data(SIGTYPcode > 7, all CALTYPcode) are only with BAQMODcode = 0";
@@ -292,19 +296,23 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
             }
         }
 
-        for (size_t i = 0; i < sentinelOneParam.PacketDataLength - 62 + 1; i++) {
-            rawData.read(reinterpret_cast<char*>(&tmp8), sizeof(tmp8));
-        }
+		std::vector<uint8_t> data;
+		std::vector<std::complex<float>> output;
 
+		output.resize(2 * sentinelOneParam.NumberOfQuads);
+		data.resize(sentinelOneParam.PacketDataLength - 62);
+
+		rawData.read(reinterpret_cast<char*>(data.data()), sentinelOneParam.PacketDataLength - 62);
+
+		state._mmap_data = data.data();
 
         if (sentinelOneParam.BAQMode == BAQMode::BypassMode && (static_cast<int>(sentinelOneParam.CalType) > 7)) {
         }
 
         if (sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) {
             if (sentinelOneParam.SignalType == SignalType::Echo) {
-                j += 1;
-            }
-            i += 1;
+				initDecodePacket(output.data(), sentinelOneParam);
+			}
         }
 
         header.emplace_back(sentinelOneParam);
@@ -457,354 +465,1867 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
     }
 }
 
-void Sentinel1PacketDecode::reconstruction(unsigned char* BRCn, unsigned char* THIDXn, ShCode* hcode, int NQ, float* result) {
-    int hcode_index = 0, h;
-    int BRCindex = 0;
-    int inc = 128;
-    do
-    {
-        if ((hcode_index + 128) > NQ) {
-            inc = (NQ - hcode_index);                      
-        }
-
-        for (h = 0; h < inc; h++) {
-            switch (BRCn[BRCindex]) {
-            case 0:
-                if (THIDXn[BRCindex] <= 3) {
-                    if (hcode[hcode_index].mcode < 3) {
-                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
-                    }
-                    else if (hcode[hcode_index].mcode == 3) {
-                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC0[THIDXn[BRCindex]];
-                    }
-                }
-                else {
-                    result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL0[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
-                }
-                break;
-            case 1:
-                if (THIDXn[BRCindex] <= 3)
-                {
-                    if (hcode[hcode_index].mcode < 4)
-                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
-                    else
-                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC1[THIDXn[BRCindex]];
-                }
-                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL1[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
-                break;
-            case 2:
-                if (THIDXn[BRCindex] <= 5)
-                {
-                    if (hcode[hcode_index].mcode < 6)
-                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
-                    else
-                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC2[THIDXn[BRCindex]];
-                }
-                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL2[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
-                break;
-            case 3:
-                if (THIDXn[BRCindex] <= 6)
-                {
-                    if (hcode[hcode_index].mcode < 9)
-                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
-                    else
-                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC3[THIDXn[BRCindex]];
-                }
-                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL3[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
-                break;
-            case 4:
-                if (THIDXn[BRCindex] <= 8)
-                {
-                    if (hcode[hcode_index].mcode < 15)
-                        result[hcode_index] = (float)(hcode[hcode_index].sign * hcode[hcode_index].mcode);
-                    else
-                        result[hcode_index] = (float)(hcode[hcode_index].sign) * BRC4[THIDXn[BRCindex]];
-                }
-                else  result[hcode_index] = (float)(hcode[hcode_index].sign) * NRL4[hcode[hcode_index].mcode] * SF[THIDXn[BRCindex]];
-                break;
-            default: 
-                printf("UNHANDLED CASE\n"); 
-                exit(-1);
-            }
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
+void Sentinel1PacketDecode::init_sequential_bit_function(sequential_bit_t* seq_state, size_t byte_pos) {
+	seq_state->data = state._mmap_data;
+	seq_state->current_bit_count = 0;
+}
+void Sentinel1PacketDecode::consume_padding_bits(sequential_bit_t* s) {
+	auto byte_offset = static_cast<int>(((s->data) - (static_cast<uint8_t*>(state._mmap_data))));
+	// make sure we are at first bit of an even byte in the next read
+	if ((0) == (byte_offset % 2)) {
+		// we are in an even byte
+		if ((0) == (s->current_bit_count)) {
+			// nothing to be done
+		}
+		else {
+			(s->data) += (2);
+			s->current_bit_count = 0;
+		}
+	}
+	else {
+		// we are in an odd byte
+		(s->data) += (1);
+		s->current_bit_count = 0;
+	}
+}
+inline int Sentinel1PacketDecode::get_bit_rate_code(sequential_bit_t* s) {
+	// note: evaluation order is crucial
+	auto brc = ((((0x4) * (get_sequential_bit(s)))) +
+		(((0x2) * (get_sequential_bit(s)))) +
+		(((0x1) * (get_sequential_bit(s)))));
+	if (!((((0) == (brc)) || ((1) == (brc)) || ((2) == (brc)) || ((3) == (brc)) ||
+		((4) == (brc))))) {
+		std::cout << (std::setw(8)) << (" brc=") << (brc) << (std::endl);
+		throw std::out_of_range("brc");
+	}
+	return brc;
+}
+inline int Sentinel1PacketDecode::decode_huffman_brc0(sequential_bit_t* s) {
+	if (get_sequential_bit(s)) {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				return 3;
+			}
+			else {
+				return 2;
+			}
+		}
+		else {
+			return 1;
+		}
+	}
+	else {
+		return 0;
+	}
+}
+inline int Sentinel1PacketDecode::decode_huffman_brc1(sequential_bit_t* s) {
+	if (get_sequential_bit(s)) {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				if (get_sequential_bit(s)) {
+					return 4;
+				}
+				else {
+					return 3;
+				}
+			}
+			else {
+				return 2;
+			}
+		}
+		else {
+			return 1;
+		}
+	}
+	else {
+		return 0;
+	}
+}
+inline int Sentinel1PacketDecode::decode_huffman_brc2(sequential_bit_t* s) {
+	if (get_sequential_bit(s)) {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				if (get_sequential_bit(s)) {
+					if (get_sequential_bit(s)) {
+						if (get_sequential_bit(s)) {
+							return 6;
+						}
+						else {
+							return 5;
+						}
+					}
+					else {
+						return 4;
+					}
+				}
+				else {
+					return 3;
+				}
+			}
+			else {
+				return 2;
+			}
+		}
+		else {
+			return 1;
+		}
+	}
+	else {
+		return 0;
+	}
+}
+inline int Sentinel1PacketDecode::decode_huffman_brc3(sequential_bit_t* s) {
+	if (get_sequential_bit(s)) {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				if (get_sequential_bit(s)) {
+					if (get_sequential_bit(s)) {
+						if (get_sequential_bit(s)) {
+							if (get_sequential_bit(s)) {
+								if (get_sequential_bit(s)) {
+									return 9;
+								}
+								else {
+									return 8;
+								}
+							}
+							else {
+								return 7;
+							}
+						}
+						else {
+							return 6;
+						}
+					}
+					else {
+						return 5;
+					}
+				}
+				else {
+					return 4;
+				}
+			}
+			else {
+				return 3;
+			}
+		}
+		else {
+			return 2;
+		}
+	}
+	else {
+		if (get_sequential_bit(s)) {
+			return 1;
+		}
+		else {
+			return 0;
+		}
+	}
+}
+inline int Sentinel1PacketDecode::decode_huffman_brc4(sequential_bit_t* s) {
+	if (get_sequential_bit(s)) {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				if (get_sequential_bit(s)) {
+					if (get_sequential_bit(s)) {
+						if (get_sequential_bit(s)) {
+							if (get_sequential_bit(s)) {
+								if (get_sequential_bit(s)) {
+									if (get_sequential_bit(s)) {
+										return 15;
+									}
+									else {
+										return 14;
+									}
+								}
+								else {
+									if (get_sequential_bit(s)) {
+										return 13;
+									}
+									else {
+										return 12;
+									}
+								}
+							}
+							else {
+								if (get_sequential_bit(s)) {
+									return 11;
+								}
+								else {
+									return 10;
+								}
+							}
+						}
+						else {
+							return 9;
+						}
+					}
+					else {
+						return 8;
+					}
+				}
+				else {
+					return 7;
+				}
+			}
+			else {
+				if (get_sequential_bit(s)) {
+					return 6;
+				}
+				else {
+					return 5;
+				}
+			}
+		}
+		else {
+			if (get_sequential_bit(s)) {
+				return 4;
+			}
+			else {
+				return 3;
+			}
+		}
+	}
+	else {
+		if (get_sequential_bit(s)) {
+			if (get_sequential_bit(s)) {
+				return 2;
+			}
+			else {
+				return 1;
+			}
+		}
+		else {
+			return 0;
+		}
+	}
 }
 
-int Sentinel1PacketDecode::next_bit(unsigned char* p, int* cposition, int* bposition)
-{
-    int bit = ((p[*cposition] >> (*bposition)) & 1);
-    (*bposition)--;
-    if ((*bposition) < 0) { (*cposition)++; (*bposition) = 7; }
-    return bit;
+int Sentinel1PacketDecode::initDecodePacket(std::complex<float>* output, Sentinel1RawPacket &sentinelOneParam) {
+	std::array<uint8_t, 205> brcs;
+	std::array<uint8_t, 205> thidxs;
+	float fref = 37.53472f;
+	
+	auto number_of_quads = sentinelOneParam.NumberOfQuads;
+	auto baq_block_length = sentinelOneParam.BAQBlockLength;
+	auto number_of_baq_blocks = static_cast<int>(round(ceil((((((2.0f)) * (number_of_quads))) / (256)))));
+	auto baq_mode = sentinelOneParam.BAQMode;
+	auto swst = sentinelOneParam.SamplingWindowStartTime;
+	auto delta_t_suppressed = (((3.20e+2)) / (((8) * (fref))));
+	auto data_delay_us = swst + delta_t_suppressed;
+	sequential_bit_t s;
+
+	init_sequential_bit_function(&s, 0);
+	auto decoded_ie_symbols = 0;
+	std::array<float, MAX_NUMBER_QUADS> decoded_ie_symbols_a;
+	for (auto i = 0; (i) < (MAX_NUMBER_QUADS); i += 1) {
+		decoded_ie_symbols_a[i] = (0.f);
+	}
+	// parse ie data
+	for (int block = 0; decoded_ie_symbols < number_of_quads; block++) {
+		auto brc = get_bit_rate_code(&s);
+		brcs[block] = brc;
+		switch (brc) {
+		case 0: {
+			{
+				// reconstruction law block=ie thidx-choice=thidx-unknown brc=0
+				for (int i = 0; (((i) < (128)) && ((decoded_ie_symbols) < (number_of_quads))); i++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc0(&s);
+					auto symbol_sign = 1.0f;
+					if (sign_bit) {
+						symbol_sign = -1.0f;
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_ie_symbols_a[decoded_ie_symbols] = v;
+					(decoded_ie_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				// reconstruction law block=ie thidx-choice=thidx-unknown brc=1
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_ie_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc1(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_ie_symbols_a[decoded_ie_symbols] = v;
+					(decoded_ie_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				// reconstruction law block=ie thidx-choice=thidx-unknown brc=2
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_ie_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc2(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_ie_symbols_a[decoded_ie_symbols] = v;
+					(decoded_ie_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				// reconstruction law block=ie thidx-choice=thidx-unknown brc=3
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_ie_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc3(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_ie_symbols_a[decoded_ie_symbols] = v;
+					(decoded_ie_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				// reconstruction law block=ie thidx-choice=thidx-unknown brc=4
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_ie_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc4(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_ie_symbols_a[decoded_ie_symbols] = v;
+					(decoded_ie_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	consume_padding_bits(&s);
+	auto decoded_io_symbols = 0;
+	std::array<float, MAX_NUMBER_QUADS> decoded_io_symbols_a;
+	for (auto i = 0; (i) < (MAX_NUMBER_QUADS); (i) += (1)) {
+		decoded_io_symbols_a[i] = (0.f);
+	}
+	// parse io data
+	for (int block = 0; (decoded_io_symbols) < (number_of_quads); (block)++) {
+		auto brc = brcs[block];
+		switch (brc) {
+		case 0: {
+			{
+
+				// reconstruction law block=io thidx-choice=thidx-unknown brc=0
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_io_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc0(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_io_symbols_a[decoded_io_symbols] = v;
+					(decoded_io_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				// reconstruction law block=io thidx-choice=thidx-unknown brc=1
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_io_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc1(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_io_symbols_a[decoded_io_symbols] = v;
+					(decoded_io_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				// reconstruction law block=io thidx-choice=thidx-unknown brc=2
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_io_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc2(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_io_symbols_a[decoded_io_symbols] = v;
+					(decoded_io_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				// reconstruction law block=io thidx-choice=thidx-unknown brc=3
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_io_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc3(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_io_symbols_a[decoded_io_symbols] = v;
+					(decoded_io_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				// reconstruction law block=io thidx-choice=thidx-unknown brc=4
+				for (int i = 0;
+					(((i) < (128)) && ((decoded_io_symbols) < (number_of_quads)));
+					(i)++) {
+					auto sign_bit = get_sequential_bit(&s);
+					auto mcode = decode_huffman_brc4(&s);
+					auto symbol_sign = (1.0f);
+					if (sign_bit) {
+						symbol_sign = (-1.0f);
+					}
+					auto v = ((symbol_sign) * (mcode));
+					// in ie and io we don't have thidx yet, will be processed later
+					decoded_io_symbols_a[decoded_io_symbols] = v;
+					(decoded_io_symbols)++;
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	consume_padding_bits(&s);
+	auto decoded_qe_symbols = 0;
+	std::array<float, MAX_NUMBER_QUADS> decoded_qe_symbols_a;
+	for (auto i = 0; (i) < (MAX_NUMBER_QUADS); (i) += (1)) {
+		decoded_qe_symbols_a[i] = (0.f);
+	}
+	// parse qe data
+	for (int block = 0; (decoded_qe_symbols) < (number_of_quads); (block)++) {
+		auto thidx = get_threshold_index(&s);
+		auto brc = brcs[block];
+		thidxs[block] = thidx;
+		switch (brc) {
+		case 0: {
+			{
+
+				if ((thidx) <= (3)) {
+					// reconstruction law block=qe thidx-choice=simple brc=0
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc0(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (3)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (3)) {
+									v = ((symbol_sign) * (table_b0.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qe thidx-choice=normal brc=0
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc0(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl0.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				if ((thidx) <= (3)) {
+					// reconstruction law block=qe thidx-choice=simple brc=1
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc1(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (4)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (4)) {
+									v = ((symbol_sign) * (table_b1.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qe thidx-choice=normal brc=1
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc1(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl1.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				if ((thidx) <= (5)) {
+					// reconstruction law block=qe thidx-choice=simple brc=2
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc2(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (6)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (6)) {
+									v = ((symbol_sign) * (table_b2.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qe thidx-choice=normal brc=2
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc2(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl2.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				if ((thidx) <= (6)) {
+					// reconstruction law block=qe thidx-choice=simple brc=3
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc3(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (9)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (9)) {
+									v = ((symbol_sign) * (table_b3.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qe thidx-choice=normal brc=3
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc3(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl3.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				if ((thidx) <= (8)) {
+					// reconstruction law block=qe thidx-choice=simple brc=4
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc4(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (15)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (15)) {
+									v = ((symbol_sign) * (table_b4.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qe thidx-choice=normal brc=4
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qe_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc4(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qe p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl4.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qe_symbols_a[decoded_qe_symbols] = v;
+						(decoded_qe_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	consume_padding_bits(&s);
+	auto decoded_qo_symbols = 0;
+	std::array<float, MAX_NUMBER_QUADS> decoded_qo_symbols_a;
+	for (auto i = 0; (i) < (MAX_NUMBER_QUADS); (i) += (1)) {
+		decoded_qo_symbols_a[i] = (0.f);
+	}
+	// parse qo data
+	for (int block = 0; (decoded_qo_symbols) < (number_of_quads); (block)++) {
+		auto brc = brcs[block];
+		auto thidx = thidxs[block];
+		switch (brc) {
+		case 0: {
+			{
+
+				if ((thidx) <= (3)) {
+					// reconstruction law block=qo thidx-choice=simple brc=0
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc0(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (3)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (3)) {
+									v = ((symbol_sign) * (table_b0.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qo thidx-choice=normal brc=0
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc0(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl0.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				if ((thidx) <= (3)) {
+					// reconstruction law block=qo thidx-choice=simple brc=1
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc1(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (4)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (4)) {
+									v = ((symbol_sign) * (table_b1.at(thidx)));
+								}
+								else {
+									std::setprecision(3);
+									(std::cout) << (std::setw(10))
+										<< (((std::chrono::high_resolution_clock::now()
+											.time_since_epoch()
+											.count()) -
+											(state._start_time)))
+										<< (" ") << (__FILE__) << (":") << (__LINE__)
+										<< (" ") << (__func__) << (" ")
+										<< ("mcode too large") << (" ") << (std::setw(8))
+										<< (" mcode=") << (mcode) << (std::endl);
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qo thidx-choice=normal brc=1
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc1(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl1.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				if ((thidx) <= (5)) {
+					// reconstruction law block=qo thidx-choice=simple brc=2
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc2(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (6)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (6)) {
+									v = ((symbol_sign) * (table_b2.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qo thidx-choice=normal brc=2
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc2(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl2.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				if ((thidx) <= (6)) {
+					// reconstruction law block=qo thidx-choice=simple brc=3
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc3(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (9)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (9)) {
+									v = ((symbol_sign) * (table_b3.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qo thidx-choice=normal brc=3
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc3(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl3.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				if ((thidx) <= (8)) {
+					// reconstruction law block=qo thidx-choice=simple brc=4
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc4(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							if ((mcode) < (15)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (15)) {
+									v = ((symbol_sign) * (table_b4.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				else {
+					// reconstruction law block=qo thidx-choice=normal brc=4
+					for (int i = 0;
+						(((i) < (128)) && ((decoded_qo_symbols) < (number_of_quads)));
+						(i)++) {
+						auto sign_bit = get_sequential_bit(&s);
+						auto mcode = decode_huffman_brc4(&s);
+						auto symbol_sign = (1.0f);
+						if (sign_bit) {
+							symbol_sign = (-1.0f);
+						}
+						// decode qo p.75
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl4.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_qo_symbols_a[decoded_qo_symbols] = v;
+						(decoded_qo_symbols)++;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	consume_padding_bits(&s);
+	for (auto block = 0; (block) < (number_of_baq_blocks); (block) += (1)) {
+		auto brc = brcs[block];
+		auto thidx = thidxs[block];
+		switch (brc) {
+		case 0: {
+			{
+
+				// decode ie p.74 reconstruction law middle choice brc=0
+				if ((thidx) <= (3)) {
+					// decode ie p.74 reconstruction law simple brc=0
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (3)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (3)) {
+									v = ((symbol_sign) * (table_b0.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode ie p.74 reconstruction law normal brc=0
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl0.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				// decode ie p.74 reconstruction law middle choice brc=1
+				if ((thidx) <= (3)) {
+					// decode ie p.74 reconstruction law simple brc=1
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (4)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (4)) {
+									v = ((symbol_sign) * (table_b1.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode ie p.74 reconstruction law normal brc=1
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl1.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				// decode ie p.74 reconstruction law middle choice brc=2
+				if ((thidx) <= (5)) {
+					// decode ie p.74 reconstruction law simple brc=2
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (6)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (6)) {
+									v = ((symbol_sign) * (table_b2.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode ie p.74 reconstruction law normal brc=2
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl2.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				// decode ie p.74 reconstruction law middle choice brc=3
+				if ((thidx) <= (6)) {
+					// decode ie p.74 reconstruction law simple brc=3
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (9)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (9)) {
+									v = ((symbol_sign) * (table_b3.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode ie p.74 reconstruction law normal brc=3
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl3.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				// decode ie p.74 reconstruction law middle choice brc=4
+				if ((thidx) <= (8)) {
+					// decode ie p.74 reconstruction law simple brc=4
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (15)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (15)) {
+									v = ((symbol_sign) * (table_b4.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode ie p.74 reconstruction law normal brc=4
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_ie_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_ie_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode ie p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl4.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_ie_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	for (auto block = 0; (block) < (number_of_baq_blocks); (block) += (1)) {
+		auto brc = brcs[block];
+		auto thidx = thidxs[block];
+		switch (brc) {
+		case 0: {
+			{
+
+				// decode io p.74 reconstruction law middle choice brc=0
+				if ((thidx) <= (3)) {
+					// decode io p.74 reconstruction law simple brc=0
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (3)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (3)) {
+									v = ((symbol_sign) * (table_b0.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode io p.74 reconstruction law normal brc=0
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl0.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 1: {
+			{
+
+				// decode io p.74 reconstruction law middle choice brc=1
+				if ((thidx) <= (3)) {
+					// decode io p.74 reconstruction law simple brc=1
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (4)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (4)) {
+									v = ((symbol_sign) * (table_b1.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode io p.74 reconstruction law normal brc=1
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl1.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 2: {
+			{
+
+				// decode io p.74 reconstruction law middle choice brc=2
+				if ((thidx) <= (5)) {
+					// decode io p.74 reconstruction law simple brc=2
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (6)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (6)) {
+									v = ((symbol_sign) * (table_b2.at(thidx)));
+								}
+								else {
+
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode io p.74 reconstruction law normal brc=2
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl2.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 3: {
+			{
+
+				// decode io p.74 reconstruction law middle choice brc=3
+				if ((thidx) <= (6)) {
+					// decode io p.74 reconstruction law simple brc=3
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (9)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (9)) {
+									v = ((symbol_sign) * (table_b3.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode io p.74 reconstruction law normal brc=3
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl3.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		case 4: {
+			{
+
+				// decode io p.74 reconstruction law middle choice brc=4
+				if ((thidx) <= (8)) {
+					// decode io p.74 reconstruction law simple brc=4
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							if ((mcode) < (15)) {
+								v = ((symbol_sign) * (mcode));
+							}
+							else {
+								if ((mcode) == (15)) {
+									v = ((symbol_sign) * (table_b4.at(thidx)));
+								}
+								else {
+									assert(0);
+								}
+							}
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				else {
+					// decode io p.74 reconstruction law normal brc=4
+					for (int i = 0; (((i) < (128)) && ((((i)+(((128) * (block))))) <
+						(decoded_io_symbols)));
+						(i)++) {
+						auto pos = ((i)+(((128) * (block))));
+						auto scode = decoded_io_symbols_a[pos];
+						auto mcode = static_cast<int>(fabsf(scode));
+						auto symbol_sign = copysignf((1.0f), scode);
+						// decode io p.74 reconstruction law right side
+						auto v = (0.f);
+						try {
+							v = ((symbol_sign) * (table_nrl4.at(mcode)) *
+								(table_sf.at(thidx)));
+						}
+						catch (std::out_of_range e) {
+							assert(0);
+						};
+						decoded_io_symbols_a[pos] = v;
+					}
+				}
+				break;
+			}
+			break;
+		}
+		default: {
+			{
+				assert(0);
+				break;
+			}
+			break;
+		}
+		}
+	}
+	assert((decoded_ie_symbols) == (decoded_io_symbols));
+	assert((decoded_ie_symbols) == (decoded_qe_symbols));
+	assert((decoded_qo_symbols) == (decoded_qe_symbols));
+	for (auto i = 0; (i) < (decoded_ie_symbols); (i) += (1)) {
+		output[((2) * (i))].real(decoded_ie_symbols_a[i]);
+		output[((2) * (i))].imag(decoded_qe_symbols_a[i]);
+		output[((1) + (((2) * (i))))].real(decoded_io_symbols_a[i]);
+		output[((1) + (((2) * (i))))].imag(decoded_qo_symbols_a[i]);
+	}
+	auto n = ((decoded_ie_symbols)+(decoded_io_symbols));
+	return n;
 }
-
-unsigned char Sentinel1PacketDecode::get_THIDX(unsigned char* p, int* cposition, int* bposition)
-{
-    int res = 0;
-    int k;
-    for (k = 0; k < 8; k++)
-    {
-        res = res << 1;
-        res += next_bit(p, cposition, bposition);
-    }
-    return(res);
-}
-
-ShCode Sentinel1PacketDecode::BRC_4(unsigned char* p, int* cposition, int* bposition)
-{
-    int hcode, sign;
-    ShCode sol;
-    int b;
-    sign = next_bit(p, cposition, bposition);
-    if (sign == 0) sol.sign = 1; else sol.sign = -1;
-    hcode = 0;
-    do {
-        b = next_bit(p, cposition, bposition);
-        switch (hcode)
-        {
-        case 5:
-            if (b == 0) // must be BEFORE hcode=5 at bottom
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) { sol.mcode = 5; return(sol); }  // BRC4,1100
-                else { sol.mcode = 6; return(sol); }  // BRC4,1101
-            }
-            else hcode = 6;
-            break;
-        case 6:
-        case 7:
-        case 8:
-            if (b == 0) { sol.mcode = hcode + 1; return(sol); }
-            else hcode++;
-            break;
-        case 9:
-            if (b == 0)
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) { sol.mcode = 10; return(sol); } // BRC4,11111100
-                else { sol.mcode = 11; return(sol); } // BRC4,11111101
-            }
-            else hcode++;
-            break;
-        case 10:
-            if (b == 0)
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) { sol.mcode = 12; return(sol); } // BRC4,111111100
-                else { sol.mcode = 13; return(sol); } // BRC4,111111101
-            }
-            else
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) { sol.mcode = 14; return(sol); } // BRC4,111111100
-                else { sol.mcode = 15; return(sol); } // BRC4,111111101
-            }
-            break;
-        case 0:
-            if (b == 0)   // first 0
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) { sol.mcode = 0; return(sol); }  // BRC4,00 
-                else
-                {
-                    b = next_bit(p, cposition, bposition);
-                    if (b == 0) { sol.mcode = 1; return(sol); } // BRC4,010
-                    else { sol.mcode = 2; return(sol); } // BRC4,011
-                }
-            }
-            else
-            {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0)  // BRC4,00 
-                {
-                    b = next_bit(p, cposition, bposition);
-                    if (b == 0) { sol.mcode = 3; return(sol); } // BRC4,100
-                    else { sol.mcode = 4; return(sol); } // BRC4,101
-                }
-                else hcode = 5;
-            }
-            break;
-        }
-    } while (hcode <= 15);
-    sol.mcode = 999;
-    exit(-1);    // should never get here
-    return(sol);
-}
-
-ShCode Sentinel1PacketDecode::BRC(int BRCn, unsigned char* p, int* cposition, int* bposition) {
-    int hcode;
-    int sign;
-    int b;
-    struct ShCode sol;
-    switch (BRCn) {
-        case 0: 
-            BRCn = 3; 
-            break; // number of steps to reach the leaves BRC0
-        case 1: 
-            BRCn = 4; 
-            break; // number of steps to reach the leaves BRC1
-        case 2: 
-            BRCn = 6; 
-            break; // number of steps to reach the leaves BRC2
-        case 3: 
-            BRCn = 9; 
-            break; // number of steps to reach the leaves BRC3
-        case 4: 
-            return(BRC_4(p, cposition, bposition));
-            printf("\nCheck if BRC4 output is correct\n"); 
-            break;
-        default: 
-            printf("ERROR"); 
-    }
-    sign = next_bit(p, cposition, bposition);
-    if (sign == 0) {
-        sol.sign = 1; 
-    }
-    else {
-        sol.sign = -1;
-    }
-    hcode = 0;
-    do {
-        b = next_bit(p, cposition, bposition);
-        if (b == 0) {
-            if ((BRCn == 9) && (hcode == 0)) {
-                b = next_bit(p, cposition, bposition);
-                if (b == 0) {
-                    sol.mcode = hcode;
-                    return(sol);
-                }
-                else {
-                    sol.mcode = hcode + 1;
-                    return(sol);
-                }
-            }
-            else {
-                sol.mcode = hcode;
-                return(sol);
-            }
-        }
-        else {
-            hcode++;                                
-            if ((BRCn == 9) && (hcode == 1)) {
-                hcode++;
-            }
-            if (hcode == BRCn) {
-                sol.mcode = hcode; 
-                return(sol);
-            }      
-        }
-    } while (hcode < BRCn);
-    exit(-1);                                     
-    sol.mcode = 99;
-    return(sol);                                  
-}
-
-int Sentinel1PacketDecode::packet_decode(unsigned char* p, int NQ, float* IE, float* IO, float* QE, float* QO) {
-    std::vector<ShCode> hcodeIE(52378);
-    std::vector<ShCode> hcodeIO(52378);
-    std::vector<ShCode> hcodeQE(52378);
-    std::vector<ShCode> hcodeQO(52378);
-    std::vector<uint8_t> BRCn(410);
-    std::vector<uint8_t> THIDXn(410);
-
-    int BRCindex;
-    int h;
-    int hcode_index;
-    int cposition = 0;
-    int bposition = 7;
-    int inc = 128;  
-    BRCindex = 0;
-    hcode_index = 0;
-    do {
-        BRCn[BRCindex] = next_bit(p, &cposition, &bposition) * 4;  // MSb=4
-        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 2; // then 2
-        BRCn[BRCindex] += next_bit(p, &cposition, &bposition) * 1; // then 1 ...
-        if ((hcode_index + 128) > NQ) {
-            inc = (NQ - hcode_index);      
-        }
-        for (h = 0; h < inc; h++) {
-            hcodeIE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    
-    inc = 128;
-    if (bposition != 7) { 
-        bposition = 7; 
-        cposition++; 
-    } 
-    
-    if ((cposition & 1) != 0) { 
-        cposition++; 
-    }        
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeIO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    inc = 128;
-    if (bposition != 7) { 
-        bposition = 7; 
-        cposition++; 
-    } 
-    if ((cposition & 1) != 0) { 
-        cposition++; 
-    } 
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        THIDXn[BRCindex] = get_THIDX(p, &cposition, &bposition);
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) // p.68: 128 HCodes
-        {
-            hcodeQE[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-    inc = 128;
-    if (bposition != 7) { 
-        bposition = 7; 
-        cposition++; 
-    } // start at new position
-    if ((cposition & 1) != 0) { 
-        cposition++; 
-    }     // odd address => +1 
-    BRCindex = 0;
-    hcode_index = 0;
-    do
-    {
-        if ((hcode_index + 128) > NQ) inc = (NQ - hcode_index);                      // smaller increment to match NQ
-        for (h = 0; h < inc; h++) {
-            hcodeQO[hcode_index] = BRC(BRCn[BRCindex], p, &cposition, &bposition); // 128 samples with same BRC
-            hcode_index++;
-        }
-        BRCindex++;
-    } while (hcode_index < NQ);
-
-    if (bposition != 7) { 
-        bposition = 7; 
-        cposition++; 
-    } 
-    if ((cposition & 1) != 0) { 
-        cposition++; 
-    } 
-
-    reconstruction(BRCn.data(), THIDXn.data(), hcodeIE.data(), NQ, IE);
-    reconstruction(BRCn.data(), THIDXn.data(), hcodeIO.data(), NQ, IO);
-    reconstruction(BRCn.data(), THIDXn.data(), hcodeQE.data(), NQ, QE);
-    reconstruction(BRCn.data(), THIDXn.data(), hcodeQO.data(), NQ, QO);
-    return(cposition);
-}
-

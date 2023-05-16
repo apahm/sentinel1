@@ -29,6 +29,41 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(QT_ROOT "Path to QT_ROOT" CACHE PATH "Path to Qt installed location.")
+
+find_path(QT_CMAKE_PATH Qt5Config.cmake ${QT_ROOT}/lib/cmake/Qt5)
+mark_as_advanced(QT_CMAKE_PATH)
+
+if(NOT QT_CMAKE_PATH)
+    message(FATAL_ERROR 
+        "QT installation not found. Please set QT_ROOT to point to the QT installation.
+        e.g C:/Qt/Qt5.9.1/5.9.1/msvc2015_64"
+    )
+endif()
+
+# Instruct CMake to run moc automatically when needed
+set(CMAKE_AUTOMOC ON)
+# Create code from a list of Qt designer ui files
+set(CMAKE_AUTOUIC ON)
+# Create code to handle resources
+set(CMAKE_AUTORCC ON)
+
+list(APPEND CMAKE_PREFIX_PATH ${QT_ROOT})
+
+find_package(Qt5 
+    COMPONENTS 
+        Widgets 
+        DataVisualization
+        Core
+        LinguistTools
+        Gui
+        Network
+        PrintSupport
+        Concurrent
+        Svg
+    REQUIRED
+)
+
 add_executable(KeysightTechnologiesControl src/main.cpp)
 
 if(MSVC)
@@ -52,6 +87,11 @@ target_sources(KeysightTechnologiesControl PRIVATE
     src/sentinel1_packet_decode.cpp
     src/sentinel1.h
     src/sentinel1.cpp
+    src/RLI.cpp
+    src/RLI.h
+    src/RLI.ui
+    src/zoom.cpp
+    src/zoom.h
 )
 
 target_include_directories(KeysightTechnologiesControl PRIVATE  
@@ -71,7 +111,32 @@ add_custom_command(
 ) 
 
 target_link_libraries(KeysightTechnologiesControl PRIVATE
+    Qt5::Concurrent
+    Qt5::Core
+    Qt5::DataVisualization
+    Qt5::Gui
+    Qt5::Network
+    Qt5::PrintSupport
+    Qt5::Widgets
+    Qt5::Svg
     #Boost::log
     #Boost::system
     #Boost::log_setup
 )
+
+add_custom_command(
+    TARGET KeysightTechnologiesControl POST_BUILD  
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:Qt5::Core>
+        $<TARGET_FILE:Qt5::DataVisualization>
+        $<TARGET_FILE:Qt5::Gui>
+        $<TARGET_FILE:Qt5::Network>
+        $<TARGET_FILE:Qt5::PrintSupport>
+        $<TARGET_FILE:Qt5::Widgets>
+        $<TARGET_FILE:Qt5::Svg>
+        $<TARGET_FILE_DIR:KeysightTechnologiesControl>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${QT_ROOT}/plugins/platforms
+        $<TARGET_FILE_DIR:KeysightTechnologiesControl>/platforms
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IPP_DLLS} $<TARGET_FILE_DIR:KeysightTechnologiesControl>
+) 

@@ -301,7 +301,7 @@ public:
     std::vector<Sentinel1RawPacket> header;
     std::vector<PositionVelocityTime> positionVelocityTime;
     std::vector<Attitude> attitude;
-
+    std::vector<std::vector<std::complex<float>>> out;
     // table 5.2-1 simple reconstruction parameter values B
     const std::array<const float, 4> table_b0 = { 3, 3, (3.160f), (3.530f) };
     const std::array<const float, 4> table_b1 = { 4, 4, (4.080f), (4.370f) };

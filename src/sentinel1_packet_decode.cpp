@@ -298,7 +298,7 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
 
 		std::vector<uint8_t> data;
 		std::vector<std::complex<float>> output;
-
+		
 		output.resize(2 * sentinelOneParam.NumberOfQuads);
 		data.resize(sentinelOneParam.PacketDataLength - 62);
 
@@ -313,9 +313,9 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
         if (sentinelOneParam.BAQMode == BAQMode::FDBAQMode0) {
             if (sentinelOneParam.SignalType == SignalType::Echo) {
 				if (initDecodePacket(output.data(), sentinelOneParam) == 2 * sentinelOneParam.NumberOfQuads) {
+					out.push_back(output);
 					j += 1;
 				}
-				i += 1;
 			}
         }
 

@@ -92,6 +92,8 @@ target_sources(KeysightTechnologiesControl PRIVATE
     src/RLI.ui
     src/zoom.cpp
     src/zoom.h
+    src/radarsat1.h
+    src/radarsat1.cpp
 )
 
 target_include_directories(KeysightTechnologiesControl PRIVATE  

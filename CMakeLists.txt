@@ -94,6 +94,8 @@ target_sources(KeysightTechnologiesControl PRIVATE
     src/zoom.h
     src/radarsat1.h
     src/radarsat1.cpp
+    src/qcustomplot.cpp
+    src/qcustomplot.h
 )
 
 target_include_directories(KeysightTechnologiesControl PRIVATE  

@@ -15,9 +15,9 @@ struct ComplexMatrix {
 class Sentinel
 {
 public:
-    Sentinel::Sentinel();
+    Sentinel();
 
-    Sentinel::~Sentinel();
+    ~Sentinel();
 
     float getNormSateliteVelocity(Sentinel1PacketDecode& sentinel1PacketDecode, uint64_t numberOfNavigPacket);
     float getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDecode);
@@ -57,10 +57,9 @@ public:
     void CorrectQChannelForNonOrthogonality(ComplexMatrix & rawData, RawDataAnalysis & rawDataAnalysis);
 
     template<typename T>
-    void NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR);
+    std::complex<double> NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR, double i);
 
-    template<typename T>
-    T getRangeReferenceFunction(T  TXPL, T TXPSF, T TXPRR);
+    bool checkRefFunc();
 
     template<typename T>
     T MigrationFactor(T carrierFrequency, T freqAzimuth, T effectiveRadarVelocity);
@@ -69,7 +68,53 @@ public:
     T AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effectiveRadarVelocity, T slantRange);
 
     int rangeCompression(ComplexMatrix& rawData, bool calcIfft = true);
-private:
+
+    float RangeDecimationToSampleRate(RangeDecimation& rangeDecimation) {
+        float fRef = 37.53472224 * 1e6;
+        float sampleRate = 0.0;
+        switch (rangeDecimation) {
+        case RangeDecimation::Filter0:
+            sampleRate = 3 * fRef;
+            break;
+        case RangeDecimation::Filter1:
+            sampleRate = (8 / 3) * fRef;
+            break;
+        case RangeDecimation::Filter3:
+            sampleRate = (20 / 9) * fRef;
+            break;
+        case RangeDecimation::Filter4:
+            sampleRate = (16 / 9) * fRef;
+            break;
+        case RangeDecimation::Filter5:
+            sampleRate = (3 / 2) * fRef;
+            break;
+        case RangeDecimation::Filter6:
+            sampleRate = (4 / 3) * fRef;
+            break;
+        case RangeDecimation::Filter7:
+            sampleRate = (2 / 3) * fRef;
+            break;
+        case RangeDecimation::Filter8:
+            sampleRate = (12 / 7) * fRef;
+            break;
+        case RangeDecimation::Filter9:
+            sampleRate = (5 / 4) * fRef;
+            break;
+        case RangeDecimation::Filter10:
+            sampleRate = (6 / 13) * fRef;
+            break;
+        case RangeDecimation::Filter11:
+            sampleRate = (16 / 11) * fRef;
+            break;
+        default:
+            break;
+        }
+        return sampleRate;
+    }
+
+    int calcParams();
+
+    Sentinel1PacketDecode sentinel1PacketDecode;
     const double speedOfLight = 299792458.0;
     double rangeStartTime = 0.0;
     double wavelength = speedOfLight / 5.405e9;
@@ -80,9 +125,8 @@ private:
     std::vector<float> fastTime;
     std::vector<float> slantRange;
     std::vector<float> azimuthFreq;
-    std::vector<float> rangeFreq;
     std::vector<float> migrationFactor;
-    Sentinel1PacketDecode sentinel1PacketDecode;
+    std::vector<std::complex<double>> refFunc;
 };
 
 

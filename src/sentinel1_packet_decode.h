@@ -277,14 +277,11 @@ struct sequential_bit_t {
 
 typedef struct sequential_bit_t sequential_bit_t;
 
-
-
 class Sentinel1PacketDecode
 {
 public:
     Sentinel1PacketDecode();
 	~Sentinel1PacketDecode();
-	float RangeDecimationToSampleRate(RangeDecimation& rangeDecimation);
     float calcRxGain(uint8_t rawRxGain);
     float calcTxPulseRampRate(uint16_t rawTxPulseRampRate);
     float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate);

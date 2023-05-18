@@ -11,49 +11,6 @@ Sentinel1PacketDecode::~Sentinel1PacketDecode() {
 
 }
 
-float Sentinel1PacketDecode::RangeDecimationToSampleRate(RangeDecimation& rangeDecimation) {
-    float fRef = 37.53472224;
-    float sampleRate = 0.0;
-    switch (rangeDecimation) {
-    case RangeDecimation::Filter0:
-        sampleRate = 3 * fRef;
-        break;
-    case RangeDecimation::Filter1:
-        sampleRate = (8 / 3) * fRef;
-        break;
-    case RangeDecimation::Filter3:
-        sampleRate = (20 / 9) * fRef;
-        break;
-    case RangeDecimation::Filter4:
-        sampleRate = (16 / 9) * fRef;
-        break;
-    case RangeDecimation::Filter5:
-        sampleRate = (3 / 2) * fRef;
-        break;
-    case RangeDecimation::Filter6:
-        sampleRate = (4 / 3) * fRef;
-        break;
-    case RangeDecimation::Filter7:
-        sampleRate = (2 / 3) * fRef;
-        break;
-    case RangeDecimation::Filter8:
-        sampleRate = (12 / 7) * fRef;
-        break;
-    case RangeDecimation::Filter9:
-        sampleRate = (5 / 4) * fRef;
-        break;
-    case RangeDecimation::Filter10:
-        sampleRate = (6 / 13) * fRef;
-        break;
-    case RangeDecimation::Filter11:
-        sampleRate = (16 / 11) * fRef;
-        break;
-    default:
-        break;
-    }
-    return sampleRate;
-}
-
 float Sentinel1PacketDecode::calcRxGain(uint8_t rawRxGain) {
     return -(static_cast<float>(rawRxGain) * 0.5);
 }
@@ -76,17 +33,17 @@ float Sentinel1PacketDecode::calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, 
 
 uint32_t Sentinel1PacketDecode::calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
     float fRef = 37.53472224;
-    return static_cast<float>(rawTxPulseStartFreq) / fRef;
+    return static_cast<float>(rawTxPulseStartFreq)  / fRef;
 }
 
 float Sentinel1PacketDecode::calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval) {
     float fRef = 37.53472224;
-    return static_cast<float>(rawPulseRepetitionInterval) / fRef;
+    return static_cast<float>(rawPulseRepetitionInterval) * 1e-6 / fRef;
 }
 
 float Sentinel1PacketDecode::calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime) {
     float fRef = 37.53472224;
-    return static_cast<float>(rawSamplingWindowStartTime) / fRef;
+    return static_cast<float>(rawSamplingWindowStartTime) * 1e-6 / fRef;
 }
 
 float Sentinel1PacketDecode::calcSamplingWindowLength(uint32_t rawSamplingWindowLength) {
@@ -314,12 +271,14 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
             if (sentinelOneParam.SignalType == SignalType::Echo) {
 				if (initDecodePacket(output.data(), sentinelOneParam) == 2 * sentinelOneParam.NumberOfQuads) {
 					out.push_back(output);
+					header.emplace_back(sentinelOneParam);
 					j += 1;
+				}
+				if (j == 1000) {
+					break;
 				}
 			}
         }
-
-        header.emplace_back(sentinelOneParam);
     };
 
     PositionVelocityTime pvt;

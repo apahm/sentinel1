@@ -3,7 +3,8 @@
 
 Sentinel::Sentinel()
 {
-
+    sentinel1PacketDecode.ReadSARParam("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE.SAFE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
+    calcParams();
 }
 
 Sentinel::~Sentinel()
@@ -235,13 +236,31 @@ void Sentinel::CorrectQChannelForNonOrthogonality(ComplexMatrix& rawData, RawDat
     }
 }
 
-template<typename T>
-void Sentinel::NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR) {
-    std::vector<std::complex<float>> refFunc;
+bool Sentinel::checkRefFunc() {
+    double TXPRR = sentinel1PacketDecode.header[0].TxRampRate;
+    double TXPSF = sentinel1PacketDecode.header[0].TxPulseStartFreq;
+    double TXPL = sentinel1PacketDecode.header[0].TxPulseLength;
 
-    for (size_t i = 0; i < TXPL; i++) {
-        refFunc.emplace_back(std::exp(std::complex<float>(2 * M_PI * (((TXPSF - TXPRR * (-TXPL / 2)) * i + (TXPRR / 2) * std::pow(i, 2))))));
+    bool f = false;
+
+    for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
+        if (TXPRR != sentinel1PacketDecode.header[i].TxRampRate) {
+            f = true;
+        }
+        if (TXPSF != sentinel1PacketDecode.header[i].TxPulseStartFreq) {
+            f = true;
+        }
+        if (TXPL != sentinel1PacketDecode.header[i].TxPulseLength) {
+            f = true;
+        }
     }
+
+    return f;
+}
+
+template<typename T>
+std::complex<double> Sentinel::NominalImageReplicaGeneration(T  TXPL, T TXPSF, T TXPRR, double i) {
+    return std::exp(std::complex<double>(2 * M_PI * (((TXPSF - TXPRR * (-TXPL / 2)) * i + (TXPRR / 2) * std::pow(i, 2)))));
 }
 
 template<typename T>
@@ -252,4 +271,43 @@ T Sentinel::MigrationFactor(T carrierFrequency, T freqAzimuth, T effectiveRadarV
 template<typename T>
 T Sentinel::AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effectiveRadarVelocity, T slantRange) {
     return 2 * std::pow(effectiveRadarVelocity, 2) * MigrationFactor<T>(carrierFrequency, frequencyDopplerCentroid, effectiveRadarVelocity) / ((speedOfLight / carrierFrequency) * slantRange);
+}
+
+int Sentinel::calcParams() {
+    rangeSampleFreq = RangeDecimationToSampleRate(sentinel1PacketDecode.header[0].RangeDecimation);
+    rangeSamplePeriod = 1.0 / rangeSampleFreq;
+    rangeStartTime = sentinel1PacketDecode.header[0].SamplingWindowStartTime + 320.0 * 1e-6 / (8 * 37.53472224);
+    azSampleFreq = 1 / sentinel1PacketDecode.header[0].PulseRepetitionInterval;
+    azSamplePeriod = sentinel1PacketDecode.header[0].PulseRepetitionInterval;
+
+    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
+        fastTime.push_back(rangeStartTime + i * rangeSamplePeriod);
+    }
+
+    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
+        slantRange.push_back((sentinel1PacketDecode.header[0].Rank * sentinel1PacketDecode.header[0].PulseRepetitionInterval + fastTime.at(i)) * speedOfLight / 2);
+    }
+    float SWL = sentinel1PacketDecode.header[0].NumberOfQuads * 2 / rangeSampleFreq;
+
+    for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
+        azimuthFreq.push_back((-azSampleFreq / 2) + i / (sentinel1PacketDecode.header[0].PulseRepetitionInterval * sentinel1PacketDecode.out.size()));
+    }
+
+    double TXPRR = 1e12 * sentinel1PacketDecode.header[0].TxRampRate;
+    double TXPSF = 1e6 * sentinel1PacketDecode.header[0].TxPulseStartFreq;
+    double TXPL = 1e-6 * sentinel1PacketDecode.header[0].TxPulseLength;
+
+    for (size_t i = 0; i < static_cast<int>(TXPL * rangeSampleFreq); i++) {
+        double samplingT = (double)i / (double)rangeSampleFreq - (double)TXPL / 2.0;
+        double sum1 = (TXPSF + TXPRR * (TXPL / 2)) * samplingT;
+        double sum2 = TXPRR * std::pow(samplingT, 2) / 2;
+
+        double arg = 2 * M_PI * (sum1 + sum2);
+        double re = cos(arg);
+        double im = sin(arg);
+
+        refFunc.push_back(std::complex<double>(re, im));
+    }
+
+    return 0;
 }

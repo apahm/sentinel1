@@ -285,7 +285,7 @@ public:
     float calcRxGain(uint8_t rawRxGain);
     float calcTxPulseRampRate(uint16_t rawTxPulseRampRate);
     float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate);
-    uint32_t calcTxPulseLength(uint32_t rawTxPulseStartFreq);
+    float calcTxPulseLength(uint32_t rawTxPulseStartFreq);
     float calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval);
     float calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime);
     float calcSamplingWindowLength(uint32_t rawSamplingWindowLength);

@@ -31,7 +31,7 @@ float Sentinel1PacketDecode::calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, 
     return TxPulseRampRate / (4 * fRef) + std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -14);
 }
 
-uint32_t Sentinel1PacketDecode::calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
+float Sentinel1PacketDecode::calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
     float fRef = 37.53472224;
     return static_cast<float>(rawTxPulseStartFreq)  / fRef;
 }

@@ -309,5 +309,7 @@ int Sentinel::calcParams() {
         refFunc.push_back(std::complex<double>(re, im));
     }
 
+
+
     return 0;
 }

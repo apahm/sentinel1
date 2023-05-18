@@ -60,49 +60,17 @@ float Sentinel::getNormSatelitePosition(Sentinel1PacketDecode& sentinel1PacketDe
 }
 
 int Sentinel::rangeCompression(ComplexMatrix& rawData, bool calcIfft) {
-    Ipp32fc* data_ref = nullptr;
     Ipp32fc* correl = nullptr;
 
-    int sizeDFTSpec = 0;
-    int sizeDFTInitBuf = 0;
-    int sizeDFTWorkBuf = 0;
-
-    Ipp8u* pDFTSpec = nullptr;
-    Ipp8u* pDFTInitBuf = nullptr;
-    Ipp8u* pDFTWorkBuf = nullptr;
-
-    IppsFFTSpec_C_32fc* pSpec = nullptr;
-
     int fft_len = 0;
-
-    data_ref = ippsMalloc_32fc(fft_len);
-    if (data_ref == nullptr)
-        return -1;
 
     correl = ippsMalloc_32fc(fft_len);
     if (correl == nullptr)
         return -1;
 
     ippsZero_32fc(correl, fft_len);
-    ippsZero_32fc(data_ref, fft_len);
 
-    pDFTSpec = ippsMalloc_8u(sizeDFTSpec);
-    if (pDFTSpec == nullptr)
-        return -1;
-    pDFTInitBuf = ippsMalloc_8u(sizeDFTInitBuf);
-    if (pDFTInitBuf == nullptr)
-        return -1;
-    pDFTWorkBuf = ippsMalloc_8u(sizeDFTWorkBuf);
-    if (pDFTWorkBuf == nullptr)
-        return -1;
 
-    //ippsFFTGetSize_C_32fc(_correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeDFTSpec, &sizeDFTInitBuf, &sizeDFTWorkBuf);
-
-    //ippsFFTInit_C_32fc(&pSpec, _correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pDFTSpec, pDFTInitBuf);
-
-    ippsFFTFwd_CToC_32fc(data_ref, data_ref, pSpec, pDFTWorkBuf);
-
-    ippsConj_32fc(data_ref, data_ref, fft_len);
 
     for (size_t i = 0; i < rawData.rows; i++)
     {
@@ -309,7 +277,26 @@ int Sentinel::calcParams() {
         refFunc.push_back(std::complex<double>(re, im));
     }
 
+    data_ref = ippsMalloc_32fc(fft_len);
+    if (data_ref == nullptr)
+        return -1;
+    ippsZero_32fc(data_ref, fft_len);
 
+    pDFTSpec = ippsMalloc_8u(sizeDFTSpec);
+    if (pDFTSpec == nullptr)
+        return -1;
+    pDFTInitBuf = ippsMalloc_8u(sizeDFTInitBuf);
+    if (pDFTInitBuf == nullptr)
+        return -1;
+    pDFTWorkBuf = ippsMalloc_8u(sizeDFTWorkBuf);
+    if (pDFTWorkBuf == nullptr)
+        return -1;
 
+    ippsFFTGetSize_C_32fc(_correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeDFTSpec, &sizeDFTInitBuf, &sizeDFTWorkBuf);
+    ippsFFTInit_C_32fc(&pSpec, _correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pDFTSpec, pDFTInitBuf);
+
+    ippsFFTFwd_CToC_32fc(data_ref, data_ref, pSpec, pDFTWorkBuf);
+
+    ippsConj_32fc(data_ref, data_ref, fft_len);
     return 0;
 }

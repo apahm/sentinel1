@@ -127,6 +127,16 @@ public:
     std::vector<float> azimuthFreq;
     std::vector<float> migrationFactor;
     std::vector<std::complex<double>> refFunc;
+    Ipp32fc* data_ref = nullptr;
+    int sizeDFTSpec = 0;
+    int sizeDFTInitBuf = 0;
+    int sizeDFTWorkBuf = 0;
+
+    Ipp8u* pDFTSpec = nullptr;
+    Ipp8u* pDFTInitBuf = nullptr;
+    Ipp8u* pDFTWorkBuf = nullptr;
+    IppsFFTSpec_C_32fc* pSpec = nullptr;
+
 };
 
 

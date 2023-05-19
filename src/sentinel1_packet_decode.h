@@ -293,8 +293,9 @@ public:
     float calcFineTime(uint16_t rawFineTime);
     uint32_t calcInstrumentConfigID(uint32_t rawInstrumentConfigID);
     uint32_t read24Bit(std::ifstream& f);
-    int ReadSARParam(std::filesystem::path pathToRawData);
+    int readRawPacket(std::filesystem::path pathToRawData);
     int initDecodePacket(Ipp32fc* output, Sentinel1RawPacket& sentinelOneParam);
+    void getAuxData();
 
     std::vector<Sentinel1RawPacket> header;
     std::vector<PositionVelocityTime> positionVelocityTime;

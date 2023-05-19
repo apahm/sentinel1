@@ -10,6 +10,7 @@
 #include "sentinel1_packet_decode.h"
 #include "sentinel1.h"
 #include <QImageWriter>
+#include "ipp.h"
 
 RLI::RLI(QWidget *parent): QMainWindow(parent) {
     ui.setupUi(this);
@@ -26,20 +27,20 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     
     float max = 0.0;
     
-    //for (int i = 0; i < azimuth; ++i) {
-    //    for (int j = 0; j < range; ++j) {
-    //        if (std::abs(sentinel.sentinel1PacketDecode.out[i][j]) > max)
-    //            max = std::abs(sentinel.sentinel1PacketDecode.out[i][j]);
-    //    }
-    //}
-    //
-    //for (int i = 0; i < azimuth; ++i) {
-    //    for (int j = 0; j < range; ++j) {
-    //        image.setPixel(i, j, qRgb(std::abs(sentinel.sentinel1PacketDecode.out[i][j]) * 255/max,
-    //            std::abs(sentinel.sentinel1PacketDecode.out[i][j]) * 255 / max, 
-    //            std::abs(sentinel.sentinel1PacketDecode.out[i][j]) * 255 / max));
-    //    }
-    //}
+    for (int i = 0; i < azimuth; ++i) {
+        for (int j = 0; j < range; ++j) {
+            if (std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) > max)
+                max = std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2));
+        }
+    }
+    
+    for (int i = 0; i < azimuth; ++i) {
+        for (int j = 0; j < range; ++j) {
+            image.setPixel(i, j, qRgb(std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255/max,
+                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max,
+                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max));
+        }
+    }
 
     _item = new QGraphicsPixmapItem (QPixmap::fromImage(image));
     _scene->addItem(_item);

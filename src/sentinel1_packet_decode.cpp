@@ -69,7 +69,7 @@ uint32_t Sentinel1PacketDecode::read24Bit(std::ifstream& f) {
     return (tmp8 << 8) | tmp16;
 }
 
-int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
+int Sentinel1PacketDecode::readRawPacket(std::filesystem::path pathToRawData) {
     uint8_t tmp8 = 0;
     uint16_t tmp16 = 0;
     uint32_t tmp32 = 0;
@@ -273,156 +273,161 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
 					out.push_back(output);
 					header.emplace_back(sentinelOneParam);
 					j += 1;
+					//if (j == 10000) {
+					//	break;
+					//}
 				}
 			}
         }
     };
+}
 
-    PositionVelocityTime pvt;
-    Attitude att;
+void Sentinel1PacketDecode::getAuxData() {
+	PositionVelocityTime pvt;
+	Attitude att;
 
-    uint16_t tmp[4] = { 0, 0, 0, 0 };
+	uint16_t tmp[4] = { 0, 0, 0, 0 };
 
-    for (size_t i = 0; i < header.size(); i++) {
-        if (header.at(i).WordIndex == 1) {
-            tmp[3] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 2) {
-            tmp[2] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 3) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 4) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.XAxisPositionECEF, tmp, sizeof(double));
-        }
-        else if (header.at(i).WordIndex == 5) {
-            tmp[3] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 6) {
-            tmp[2] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 7) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 8) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.YAxisPositionECEF, tmp, sizeof(double));
-        }
-        if (header.at(i).WordIndex == 9) {
-            tmp[3] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 10) {
-            tmp[2] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 11) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 12) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.ZAxisPositionECEF, tmp, sizeof(double));
-        }
-        else if (header.at(i).WordIndex == 13) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 14) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.XvelocityECEF, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 15) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 16) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.YvelocityECEF, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 17) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 18) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&pvt.ZvelocityECEF, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 19) {
-            pvt.DataStampOne = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 20) {
-            pvt.DataStampTwo = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 21) {
-            pvt.DataStampThree = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 22) {
-            pvt.DataStampFour = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 23) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 24) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.Q0AttitudeQuaternion, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 25) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 26) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.Q1AttitudeQuaternion, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 27) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 28) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.Q2AttitudeQuaternion, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 29) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 30) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.Q3AttitudeQuaternion, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 31) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 32) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.XangularRate, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 33) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 34) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.YangularRate, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 35) {
-            tmp[1] = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 36) {
-            tmp[0] = header.at(i).WordVal;
-            std::memcpy(&att.ZangularRate, tmp, sizeof(float));
-        }
-        else if (header.at(i).WordIndex == 37) {
-            att.DataStampOne = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 38) {
-            att.DataStampTwo = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 39) {
-            att.DataStampThree = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 40) {
-            att.DataStampFour = header.at(i).WordVal;
-        }
-        else if (header.at(i).WordIndex == 41) {
-            //header.at(i).WordVal;
-            positionVelocityTime.emplace_back(pvt);
-            attitude.emplace_back(att);
-        }
-    }
+	for (size_t i = 0; i < header.size(); i++) {
+		if (header.at(i).WordIndex == 1) {
+			tmp[3] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 2) {
+			tmp[2] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 3) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 4) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.XAxisPositionECEF, tmp, sizeof(double));
+		}
+		else if (header.at(i).WordIndex == 5) {
+			tmp[3] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 6) {
+			tmp[2] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 7) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 8) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.YAxisPositionECEF, tmp, sizeof(double));
+		}
+		if (header.at(i).WordIndex == 9) {
+			tmp[3] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 10) {
+			tmp[2] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 11) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 12) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.ZAxisPositionECEF, tmp, sizeof(double));
+		}
+		else if (header.at(i).WordIndex == 13) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 14) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.XvelocityECEF, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 15) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 16) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.YvelocityECEF, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 17) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 18) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&pvt.ZvelocityECEF, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 19) {
+			pvt.DataStampOne = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 20) {
+			pvt.DataStampTwo = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 21) {
+			pvt.DataStampThree = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 22) {
+			pvt.DataStampFour = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 23) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 24) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.Q0AttitudeQuaternion, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 25) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 26) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.Q1AttitudeQuaternion, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 27) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 28) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.Q2AttitudeQuaternion, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 29) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 30) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.Q3AttitudeQuaternion, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 31) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 32) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.XangularRate, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 33) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 34) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.YangularRate, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 35) {
+			tmp[1] = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 36) {
+			tmp[0] = header.at(i).WordVal;
+			std::memcpy(&att.ZangularRate, tmp, sizeof(float));
+		}
+		else if (header.at(i).WordIndex == 37) {
+			att.DataStampOne = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 38) {
+			att.DataStampTwo = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 39) {
+			att.DataStampThree = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 40) {
+			att.DataStampFour = header.at(i).WordVal;
+		}
+		else if (header.at(i).WordIndex == 41) {
+			//header.at(i).WordVal;
+			positionVelocityTime.emplace_back(pvt);
+			attitude.emplace_back(att);
+		}
+	}
 }
 
 void Sentinel1PacketDecode::init_sequential_bit_function(sequential_bit_t* seq_state, size_t byte_pos) {

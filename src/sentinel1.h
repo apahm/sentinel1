@@ -115,6 +115,8 @@ public:
 
     int calcParams();
 
+    int getRangeFilter();
+
     Sentinel1PacketDecode sentinel1PacketDecode;
     const double speedOfLight = 299792458.0;
     double rangeStartTime = 0.0;

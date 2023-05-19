@@ -4,7 +4,32 @@
 Sentinel::Sentinel()
 {
     sentinel1PacketDecode.ReadSARParam("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE.SAFE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
+    
     calcParams();
+
+    // Range direction
+    ippsFFTGetSize_C_32fc(fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
+
+    pRangeFFTSpec = ippsMalloc_8u(sizeRangeFFTSpec);
+    pRangeFFTInitBuf = ippsMalloc_8u(sizeRangeFFTInitBuf);
+    pRangeFFTWorkBuf = ippsMalloc_8u(sizeRangeFFTWorkBuf);
+
+    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pRangeFFTSpec, pRangeFFTInitBuf);
+
+    ippsFFTFwd_CToC_32fc(refFunc.data(), refFunc.data(), pRangeSpec, pRangeFFTWorkBuf);
+
+    ippsConj_32fc(refFunc.data(), refFunc.data(), fftLengthRange);
+
+    // Azimuth direction
+    ippsFFTGetSize_C_32fc(fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
+
+    pAzimuthFFTSpec = ippsMalloc_8u(sizeAzimuthFFTSpec);
+    pAzimuthFFTInitBuf = ippsMalloc_8u(sizeAzimuthFFTInitBuf);
+    pAzimuthFFTWorkBuf = ippsMalloc_8u(sizeAzimuthFFTWorkBuf);
+
+    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pAzimuthFFTSpec, pAzimuthFFTInitBuf);
+
+    getRangeFilter();
 }
 
 Sentinel::~Sentinel()
@@ -70,20 +95,20 @@ int Sentinel::rangeCompression(ComplexMatrix& rawData, bool calcIfft) {
 
     ippsZero_32fc(correl, fft_len);
 
-    for (size_t i = 0; i < rawData.rows; i++)
-    {
-        //ippsFFTFwd_CToC_32fc(, correl, pSpec, pDFTWorkBuf);
-
-        ippsMul_32fc(correl, refFunc.data(), correl, fft_len);
-        if (calcIfft) {
-            ippsFFTInv_CToC_32fc(correl, correl, pSpec, pDFTWorkBuf);
-        }
-    }
-
-    ippsFree(pDFTSpec);
-    ippsFree(pDFTInitBuf);
-    ippsFree(pDFTWorkBuf);
-    ippsFree(correl);
+    //for (size_t i = 0; i < rawData.rows; i++)
+    //{
+    //    //ippsFFTFwd_CToC_32fc(, correl, pSpec, pDFTWorkBuf);
+    //
+    //    ippsMul_32fc(correl, refFunc.data(), correl, fft_len);
+    //    if (calcIfft) {
+    //        ippsFFTInv_CToC_32fc(correl, correl, pSpec, pDFTWorkBuf);
+    //    }
+    //}
+    //
+    //ippsFree(pDFTSpec);
+    //ippsFree(pDFTInitBuf);
+    //ippsFree(pDFTWorkBuf);
+    //ippsFree(correl);
 
     return 0;
 }
@@ -238,32 +263,7 @@ T Sentinel::AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effe
     return 2 * std::pow(effectiveRadarVelocity, 2) * MigrationFactor<T>(carrierFrequency, frequencyDopplerCentroid, effectiveRadarVelocity) / ((speedOfLight / carrierFrequency) * slantRange);
 }
 
-int Sentinel::calcParams() {
-    fftSizeRange = std::log2(sentinel1PacketDecode.out[0].size()) + 1;
-    fftLengthRange = std::pow(2, fftSizeRange);
-
-    fftSizeAzimuth = std::log2(sentinel1PacketDecode.out.size()) + 1;
-    fftLengthAzimuth = std::pow(2, fftSizeAzimuth);
-
-    rangeSampleFreq = RangeDecimationToSampleRate(sentinel1PacketDecode.header[0].RangeDecimation);
-    rangeSamplePeriod = 1.0 / rangeSampleFreq;
-    rangeStartTime = sentinel1PacketDecode.header[0].SamplingWindowStartTime + 320.0 * 1e-6 / (8 * 37.53472224);
-    azSampleFreq = 1 / sentinel1PacketDecode.header[0].PulseRepetitionInterval;
-    azSamplePeriod = sentinel1PacketDecode.header[0].PulseRepetitionInterval;
-
-    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
-        fastTime.push_back(rangeStartTime + i * rangeSamplePeriod);
-    }
-
-    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
-        slantRange.push_back((sentinel1PacketDecode.header[0].Rank * sentinel1PacketDecode.header[0].PulseRepetitionInterval + fastTime.at(i)) * speedOfLight / 2);
-    }
-    float SWL = sentinel1PacketDecode.header[0].NumberOfQuads * 2 / rangeSampleFreq;
-
-    for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
-        azimuthFreq.push_back((-azSampleFreq / 2) + i / (sentinel1PacketDecode.header[0].PulseRepetitionInterval * sentinel1PacketDecode.out.size()));
-    }
-
+int Sentinel::getRangeFilter() {
     double TXPRR = 1e12 * sentinel1PacketDecode.header[0].TxRampRate;
     double TXPSF = 1e6 * sentinel1PacketDecode.header[0].TxPulseStartFreq;
     double TXPL = 1e-6 * sentinel1PacketDecode.header[0].TxPulseLength;
@@ -290,40 +290,33 @@ int Sentinel::calcParams() {
         tmp.im = 0.0;
         refFunc.push_back(tmp);
     }
+    return 0;
+}
 
-    // Range direction
-    ippsFFTGetSize_C_32fc(fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
-    
-    pRangeFFTSpec = ippsMalloc_8u(sizeRangeFFTSpec);
-    if (pRangeFFTSpec == nullptr)
-        return -1;
-    pRangeFFTInitBuf = ippsMalloc_8u(sizeRangeFFTInitBuf);
-    if (pRangeFFTInitBuf == nullptr)
-        return -1;
-    pRangeFFTWorkBuf = ippsMalloc_8u(sizeRangeFFTWorkBuf);
-    if (pRangeFFTWorkBuf == nullptr)
-        return -1;
-    
-    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pRangeFFTSpec, pRangeFFTInitBuf);
+int Sentinel::calcParams() {
+    fftSizeRange = std::log2(sentinel1PacketDecode.out[0].size()) + 1;
+    fftLengthRange = std::pow(2, fftSizeRange);
 
-    ippsFFTFwd_CToC_32fc(refFunc.data(), refFunc.data(), pRangeSpec, pRangeFFTWorkBuf);
+    fftSizeAzimuth = std::log2(sentinel1PacketDecode.out.size()) + 1;
+    fftLengthAzimuth = std::pow(2, fftSizeAzimuth);
 
-    ippsConj_32fc(refFunc.data(), refFunc.data(), fftLengthRange);
+    rangeSampleFreq = RangeDecimationToSampleRate(sentinel1PacketDecode.header[0].RangeDecimation);
+    rangeSamplePeriod = 1.0 / rangeSampleFreq;
+    rangeStartTime = sentinel1PacketDecode.header[0].SamplingWindowStartTime + 320.0 * 1e-6 / (8 * 37.53472224);
+    azSampleFreq = 1 / sentinel1PacketDecode.header[0].PulseRepetitionInterval;
+    azSamplePeriod = sentinel1PacketDecode.header[0].PulseRepetitionInterval;
 
-    // Azimuth direction
-    ippsFFTGetSize_C_32fc(fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
+    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
+        fastTime.push_back(rangeStartTime + i * rangeSamplePeriod);
+    }
 
-    pAzimuthFFTSpec = ippsMalloc_8u(sizeAzimuthFFTSpec);
-    if (pAzimuthFFTSpec == nullptr)
-        return -1;
-    pAzimuthFFTInitBuf = ippsMalloc_8u(sizeAzimuthFFTInitBuf);
-    if (pAzimuthFFTInitBuf == nullptr)
-        return -1;
-    pAzimuthFFTWorkBuf = ippsMalloc_8u(sizeAzimuthFFTWorkBuf);
-    if (pAzimuthFFTWorkBuf == nullptr)
-        return -1;
+    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
+        slantRange.push_back((sentinel1PacketDecode.header[0].Rank * sentinel1PacketDecode.header[0].PulseRepetitionInterval + fastTime.at(i)) * speedOfLight / 2);
+    }
+    float SWL = sentinel1PacketDecode.header[0].NumberOfQuads * 2 / rangeSampleFreq;
 
-    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pAzimuthFFTSpec, pAzimuthFFTInitBuf);
-
+    for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
+        azimuthFreq.push_back((-azSampleFreq / 2) + i / (sentinel1PacketDecode.header[0].PulseRepetitionInterval * sentinel1PacketDecode.out.size()));
+    }
     return 0;
 }

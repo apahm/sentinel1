@@ -70,13 +70,11 @@ int Sentinel::rangeCompression(ComplexMatrix& rawData, bool calcIfft) {
 
     ippsZero_32fc(correl, fft_len);
 
-
-
     for (size_t i = 0; i < rawData.rows; i++)
     {
         //ippsFFTFwd_CToC_32fc(, correl, pSpec, pDFTWorkBuf);
 
-        ippsMul_32fc(correl, data_ref, correl, fft_len);
+        ippsMul_32fc(correl, refFunc.data(), correl, fft_len);
         if (calcIfft) {
             ippsFFTInv_CToC_32fc(correl, correl, pSpec, pDFTWorkBuf);
         }
@@ -85,7 +83,6 @@ int Sentinel::rangeCompression(ComplexMatrix& rawData, bool calcIfft) {
     ippsFree(pDFTSpec);
     ippsFree(pDFTInitBuf);
     ippsFree(pDFTWorkBuf);
-    ippsFree(data_ref);
     ippsFree(correl);
 
     return 0;
@@ -242,6 +239,12 @@ T Sentinel::AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effe
 }
 
 int Sentinel::calcParams() {
+    fftSizeRange = std::log2(sentinel1PacketDecode.out[0].size()) + 1;
+    fftLengthRange = std::pow(2, fftSizeRange);
+
+    fftSizeAzimuth = std::log2(sentinel1PacketDecode.out.size()) + 1;
+    fftLengthAzimuth = std::pow(2, fftSizeAzimuth);
+
     rangeSampleFreq = RangeDecimationToSampleRate(sentinel1PacketDecode.header[0].RangeDecimation);
     rangeSamplePeriod = 1.0 / rangeSampleFreq;
     rangeStartTime = sentinel1PacketDecode.header[0].SamplingWindowStartTime + 320.0 * 1e-6 / (8 * 37.53472224);
@@ -265,6 +268,8 @@ int Sentinel::calcParams() {
     double TXPSF = 1e6 * sentinel1PacketDecode.header[0].TxPulseStartFreq;
     double TXPL = 1e-6 * sentinel1PacketDecode.header[0].TxPulseLength;
 
+    Ipp32fc tmp;
+
     for (size_t i = 0; i < static_cast<int>(TXPL * rangeSampleFreq); i++) {
         double samplingT = (double)i / (double)rangeSampleFreq - (double)TXPL / 2.0;
         double sum1 = (TXPSF + TXPRR * (TXPL / 2)) * samplingT;
@@ -274,29 +279,51 @@ int Sentinel::calcParams() {
         double re = cos(arg);
         double im = sin(arg);
 
-        refFunc.push_back(std::complex<double>(re, im));
+        tmp.re = static_cast<float>(re);
+        tmp.im = static_cast<float>(im);
+
+        refFunc.emplace_back(tmp);
     }
 
-    data_ref = ippsMalloc_32fc(fft_len);
-    if (data_ref == nullptr)
-        return -1;
-    ippsZero_32fc(data_ref, fft_len);
+    for (size_t i = static_cast<int>(TXPL * rangeSampleFreq); i < fftLengthRange; i++) {
+        tmp.re = 0.0;
+        tmp.im = 0.0;
+        refFunc.push_back(tmp);
+    }
 
-    pDFTSpec = ippsMalloc_8u(sizeDFTSpec);
-    if (pDFTSpec == nullptr)
+    // Range direction
+    ippsFFTGetSize_C_32fc(fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
+    
+    pRangeFFTSpec = ippsMalloc_8u(sizeRangeFFTSpec);
+    if (pRangeFFTSpec == nullptr)
         return -1;
-    pDFTInitBuf = ippsMalloc_8u(sizeDFTInitBuf);
-    if (pDFTInitBuf == nullptr)
+    pRangeFFTInitBuf = ippsMalloc_8u(sizeRangeFFTInitBuf);
+    if (pRangeFFTInitBuf == nullptr)
         return -1;
-    pDFTWorkBuf = ippsMalloc_8u(sizeDFTWorkBuf);
-    if (pDFTWorkBuf == nullptr)
+    pRangeFFTWorkBuf = ippsMalloc_8u(sizeRangeFFTWorkBuf);
+    if (pRangeFFTWorkBuf == nullptr)
+        return -1;
+    
+    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pRangeFFTSpec, pRangeFFTInitBuf);
+
+    ippsFFTFwd_CToC_32fc(refFunc.data(), refFunc.data(), pRangeSpec, pRangeFFTWorkBuf);
+
+    ippsConj_32fc(refFunc.data(), refFunc.data(), fftLengthRange);
+
+    // Azimuth direction
+    ippsFFTGetSize_C_32fc(fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
+
+    pAzimuthFFTSpec = ippsMalloc_8u(sizeAzimuthFFTSpec);
+    if (pAzimuthFFTSpec == nullptr)
+        return -1;
+    pAzimuthFFTInitBuf = ippsMalloc_8u(sizeAzimuthFFTInitBuf);
+    if (pAzimuthFFTInitBuf == nullptr)
+        return -1;
+    pAzimuthFFTWorkBuf = ippsMalloc_8u(sizeAzimuthFFTWorkBuf);
+    if (pAzimuthFFTWorkBuf == nullptr)
         return -1;
 
-    ippsFFTGetSize_C_32fc(_correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeDFTSpec, &sizeDFTInitBuf, &sizeDFTWorkBuf);
-    ippsFFTInit_C_32fc(&pSpec, _correlParam.size, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pDFTSpec, pDFTInitBuf);
+    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pAzimuthFFTSpec, pAzimuthFFTInitBuf);
 
-    ippsFFTFwd_CToC_32fc(data_ref, data_ref, pSpec, pDFTWorkBuf);
-
-    ippsConj_32fc(data_ref, data_ref, fft_len);
     return 0;
 }

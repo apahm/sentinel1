@@ -7,6 +7,7 @@
 #include <fstream>
 #include <array>
 #include <complex>
+#include "ipp.h"
 
 enum class ECCNumber {
     Stripmap1 = 1,
@@ -293,12 +294,12 @@ public:
     uint32_t calcInstrumentConfigID(uint32_t rawInstrumentConfigID);
     uint32_t read24Bit(std::ifstream& f);
     int ReadSARParam(std::filesystem::path pathToRawData);
-    int initDecodePacket(std::complex<float>* output, Sentinel1RawPacket& sentinelOneParam);
+    int initDecodePacket(Ipp32fc* output, Sentinel1RawPacket& sentinelOneParam);
 
     std::vector<Sentinel1RawPacket> header;
     std::vector<PositionVelocityTime> positionVelocityTime;
     std::vector<Attitude> attitude;
-    std::vector<std::vector<std::complex<float>>> out;
+    std::vector<std::vector<Ipp32fc>> out;
     // table 5.2-1 simple reconstruction parameter values B
     const std::array<const float, 4> table_b0 = { 3, 3, (3.160f), (3.530f) };
     const std::array<const float, 4> table_b1 = { 4, 4, (4.080f), (4.370f) };

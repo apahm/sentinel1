@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <numeric>
 #include <vector>
+#include "ipp.h"
 
 struct ComplexMatrix {
     std::vector<std::vector<double>> re;
@@ -126,17 +127,31 @@ public:
     std::vector<float> slantRange;
     std::vector<float> azimuthFreq;
     std::vector<float> migrationFactor;
-    std::vector<std::complex<double>> refFunc;
-    Ipp32fc* data_ref = nullptr;
-    int sizeDFTSpec = 0;
-    int sizeDFTInitBuf = 0;
-    int sizeDFTWorkBuf = 0;
+    uint32_t rangeLengthBuffer = 0;
+    uint32_t azimuthLengthBuffer = 0;
+    std::vector<Ipp32fc> refFunc;
 
-    Ipp8u* pDFTSpec = nullptr;
-    Ipp8u* pDFTInitBuf = nullptr;
-    Ipp8u* pDFTWorkBuf = nullptr;
-    IppsFFTSpec_C_32fc* pSpec = nullptr;
+    int sizeRangeFFTSpec = 0;
+    int sizeRangeFFTInitBuf = 0;
+    int sizeRangeFFTWorkBuf = 0;
+    Ipp8u* pRangeFFTSpec = nullptr;
+    Ipp8u* pRangeFFTInitBuf = nullptr;
+    Ipp8u* pRangeFFTWorkBuf = nullptr;
+    IppsFFTSpec_C_32fc* pRangeSpec = nullptr;
 
+    int sizeAzimuthFFTSpec = 0;
+    int sizeAzimuthFFTInitBuf = 0;
+    int sizeAzimuthFFTWorkBuf = 0;
+    Ipp8u* pAzimuthFFTSpec = nullptr;
+    Ipp8u* pAzimuthFFTInitBuf = nullptr;
+    Ipp8u* pAzimuthFFTWorkBuf = nullptr;
+    IppsFFTSpec_C_32fc* pAzimuthSpec = nullptr;
+
+    uint32_t fftLengthRange = 0.0;
+    uint32_t fftSizeRange = 0.0;
+
+    uint32_t fftLengthAzimuth = 0.0;
+    uint32_t fftSizeAzimuth = 0.0;
 };
 
 

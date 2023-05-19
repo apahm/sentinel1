@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1323</width>
-    <height>833</height>
+    <height>1130</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,38 +17,8 @@
    <layout class="QGridLayout" name="gridLayout_2">
     <item row="0" column="0">
      <layout class="QGridLayout" name="gridLayout">
-      <item row="3" column="0" rowspan="3">
+      <item row="0" column="0" rowspan="3">
        <widget class="QGraphicsView" name="graphicsView"/>
-      </item>
-      <item row="2" column="0">
-       <widget class="QCustomPlot" name="plot1" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>1000</width>
-          <height>1000</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QCustomPlot" name="plot2" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>1000</width>
-          <height>0</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QCustomPlot" name="plot3" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>1000</width>
-          <height>0</height>
-         </size>
-        </property>
-       </widget>
       </item>
      </layout>
     </item>
@@ -76,14 +46,6 @@
   </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
- <customwidgets>
-  <customwidget>
-   <class>QCustomPlot</class>
-   <extends>QWidget</extends>
-   <header>qcustomplot.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>

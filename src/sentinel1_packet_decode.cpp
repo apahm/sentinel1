@@ -254,7 +254,7 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
         }
 
 		std::vector<uint8_t> data;
-		std::vector<std::complex<float>> output;
+		std::vector<Ipp32fc> output;
 		
 		output.resize(2 * sentinelOneParam.NumberOfQuads);
 		data.resize(sentinelOneParam.PacketDataLength - 62);
@@ -273,9 +273,6 @@ int Sentinel1PacketDecode::ReadSARParam(std::filesystem::path pathToRawData) {
 					out.push_back(output);
 					header.emplace_back(sentinelOneParam);
 					j += 1;
-				}
-				if (j == 1000) {
-					break;
 				}
 			}
         }
@@ -664,7 +661,7 @@ inline int Sentinel1PacketDecode::decode_huffman_brc4(sequential_bit_t* s) {
 	}
 }
 
-int Sentinel1PacketDecode::initDecodePacket(std::complex<float>* output, Sentinel1RawPacket &sentinelOneParam) {
+int Sentinel1PacketDecode::initDecodePacket(Ipp32fc* output, Sentinel1RawPacket &sentinelOneParam) {
 	std::array<uint8_t, 205> brcs;
 	std::array<uint8_t, 205> thidxs;
 	float fref = 37.53472f;
@@ -2284,10 +2281,10 @@ int Sentinel1PacketDecode::initDecodePacket(std::complex<float>* output, Sentine
 	assert((decoded_ie_symbols) == (decoded_qe_symbols));
 	assert((decoded_qo_symbols) == (decoded_qe_symbols));
 	for (auto i = 0; (i) < (decoded_ie_symbols); (i) += (1)) {
-		output[((2) * (i))].real(decoded_ie_symbols_a[i]);
-		output[((2) * (i))].imag(decoded_qe_symbols_a[i]);
-		output[((1) + (((2) * (i))))].real(decoded_io_symbols_a[i]);
-		output[((1) + (((2) * (i))))].imag(decoded_qo_symbols_a[i]);
+		output[((2) * (i))].re = (decoded_ie_symbols_a[i]);
+		output[((2) * (i))].im = (decoded_qe_symbols_a[i]);
+		output[((1) + (((2) * (i))))].re = (decoded_io_symbols_a[i]);
+		output[((1) + (((2) * (i))))].im = (decoded_qo_symbols_a[i]);
 	}
 	auto n = ((decoded_ie_symbols)+(decoded_io_symbols));
 	return n;

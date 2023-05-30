@@ -62,9 +62,8 @@ public:
 
     bool checkRefFunc();
 
-    template<typename T>
-    T MigrationFactor(T carrierFrequency, T freqAzimuth, T effectiveRadarVelocity);
-
+    double MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity);
+    
     template<typename T>
     T AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effectiveRadarVelocity, T slantRange);
 
@@ -128,7 +127,8 @@ public:
     std::vector<float> fastTime;
     std::vector<float> slantRange;
     std::vector<float> azimuthFreq;
-    std::vector<float> migrationFactor;
+    std::vector<std::vector<float>> velocity;
+
     uint32_t rangeLengthBuffer = 0;
     uint32_t azimuthLengthBuffer = 0;
     std::vector<Ipp32fc> refFunc;
@@ -139,7 +139,7 @@ public:
     Ipp8u* pRangeFFTSpec = nullptr;
     Ipp8u* pRangeFFTInitBuf = nullptr;
     Ipp8u* pRangeFFTWorkBuf = nullptr;
-    IppsFFTSpec_C_32fc* pRangeSpec = nullptr;
+    IppsDFTSpec_C_32fc* pRangeSpec = nullptr;
 
     int sizeAzimuthFFTSpec = 0;
     int sizeAzimuthFFTInitBuf = 0;
@@ -147,7 +147,7 @@ public:
     Ipp8u* pAzimuthFFTSpec = nullptr;
     Ipp8u* pAzimuthFFTInitBuf = nullptr;
     Ipp8u* pAzimuthFFTWorkBuf = nullptr;
-    IppsFFTSpec_C_32fc* pAzimuthSpec = nullptr;
+    IppsDFTSpec_C_32fc* pAzimuthSpec = nullptr;
 
     uint32_t fftLengthRange = 0.0;
     uint32_t fftSizeRange = 0.0;

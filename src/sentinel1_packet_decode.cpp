@@ -273,9 +273,9 @@ int Sentinel1PacketDecode::readRawPacket(std::filesystem::path pathToRawData) {
 					out.push_back(output);
 					header.emplace_back(sentinelOneParam);
 					j += 1;
-					//if (j == 10000) {
-					//	break;
-					//}
+					if (j == 16000) {
+						//break;
+					}
 				}
 			}
         }
@@ -427,6 +427,24 @@ void Sentinel1PacketDecode::getAuxData() {
 			positionVelocityTime.emplace_back(pvt);
 			attitude.emplace_back(att);
 		}
+	}
+
+	for (size_t i = 0; i < positionVelocityTime.size(); i++) {
+		double one = positionVelocityTime.at(i).DataStampOne * std::pow(2, 24);
+		double two = positionVelocityTime.at(i).DataStampTwo * std::pow(2, 8);
+		double three = positionVelocityTime.at(i).DataStampThree * std::pow(2, -8);
+		double four = positionVelocityTime.at(i).DataStampFour * std::pow(2, -24);
+		
+		time.push_back(one + two + three + four);
+	}
+	
+	for (size_t i = 0; i < positionVelocityTime.size(); i++) {
+		normOfVelocity.push_back(std::sqrt(std::pow(positionVelocityTime.at(i).XvelocityECEF, 2) +
+											std::pow(positionVelocityTime.at(i).YvelocityECEF, 2) +
+											std::pow(positionVelocityTime.at(i).ZvelocityECEF, 2)));
+		normOfPosition.push_back(std::pow(positionVelocityTime.at(i).XAxisPositionECEF, 2) +
+								std::pow(positionVelocityTime.at(i).YAxisPositionECEF, 2) +
+								std::pow(positionVelocityTime.at(i).ZAxisPositionECEF, 2));
 	}
 }
 

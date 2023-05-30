@@ -44,9 +44,10 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
 
     _item = new QGraphicsPixmapItem (QPixmap::fromImage(image));
     _scene->addItem(_item);
-
+    
     z = new Graphics_view_zoom(ui.graphicsView);
     z->set_modifiers(Qt::NoModifier);
     ui.graphicsView->show();
+    ui.graphicsView->rotate(90);
 }
 

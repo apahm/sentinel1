@@ -28,8 +28,8 @@ void polyfit(const std::vector<double>& t,
     Eigen::VectorXd result;
 
     // check to make sure inputs are correct
-    assert(t.size() == v.size());
-    assert(t.size() >= order + 1);
+    //assert(t.size() == v.size());
+    //assert(t.size() >= order + 1);
     // Populate the matrix
     for (size_t i = 0; i < t.size(); ++i)
     {

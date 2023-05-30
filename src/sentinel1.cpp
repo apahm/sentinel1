@@ -25,7 +25,7 @@ Sentinel::Sentinel()
 
     ippsDFTInit_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pAzimuthSpec, pAzimuthFFTInitBuf);
 
-    getEffectiveVelocity(sentinel1PacketDecode);
+    //getEffectiveVelocity(sentinel1PacketDecode);
 
     getRangeFilter();
 

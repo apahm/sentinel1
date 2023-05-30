@@ -14,6 +14,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <Eigen/QR>
+#include <QVector>
 
 void polyfit(const std::vector<double>& t,
     const std::vector<double>& v,
@@ -58,18 +59,53 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
 
     // placeholder for storing polynomial coefficient
     std::vector<double> coeff;
-    polyfit(time, velocity, coeff, 3);
+    polyfit(time, velocity, coeff, 10);
 
     std::vector<double> fitted_velocity;
     std::cout << "Printing fitted values" << std::endl;
     for (int p = 0; p < time.size(); ++p)
     {
-        double vfitted = coeff[0] + coeff[1] * time.at(p) + coeff[2] * (pow(time.at(p), 2)) + coeff[3] * (pow(time.at(p), 3));
+        double vfitted = coeff[0] +
+            coeff[1] * time.at(p) +
+            coeff[2] * (pow(time.at(p), 2)) +
+            coeff[3] * (pow(time.at(p), 3)) +
+            coeff[4] * (pow(time.at(p), 4)) +
+            coeff[5] * (pow(time.at(p), 5)) +
+            coeff[6] * (pow(time.at(p), 6)) +
+            coeff[7] * (pow(time.at(p), 7)) +
+            coeff[8] * (pow(time.at(p), 8)) +
+            coeff[9] * (pow(time.at(p), 9)) +
+            coeff[10] * (pow(time.at(p), 10));
         std::cout << vfitted << ", ";
         fitted_velocity.push_back(vfitted);
     }
     std::cout << std::endl;
 
+    // add two new graphs and set their look:
+    ui.plot->addGraph();
+    ui.plot->graph(0)->setPen(QPen(Qt::blue)); // line color blue for first graph
+    //ui.plot->graph(0)->setBrush(QBrush(QColor(0, 0, 255, 20))); // first graph will be filled with translucent blue
+    ui.plot->addGraph();
+    ui.plot->graph(1)->setPen(QPen(Qt::red)); // line color red for second graph
+    // configure right and top axis to show ticks but no labels:
+    // (see QCPAxisRect::setupFullAxesBox for a quicker method to do this)
+    ui.plot->xAxis2->setVisible(true);
+    ui.plot->xAxis2->setTickLabels(false);
+    ui.plot->yAxis2->setVisible(true);
+    ui.plot->yAxis2->setTickLabels(false);
+    // make left and bottom axes always transfer their ranges to right and top axes:
+    connect(ui.plot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui.plot->xAxis2, SLOT(setRange(QCPRange)));
+    connect(ui.plot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui.plot->yAxis2, SLOT(setRange(QCPRange)));
+    // pass data points to graphs:
+    ui.plot->graph(0)->setData(QVector<double>::fromStdVector(time), QVector<double>::fromStdVector(fitted_velocity));
+    ui.plot->graph(1)->setData(QVector<double>::fromStdVector(time), QVector<double>::fromStdVector(velocity));
+    // let the ranges scale themselves so graph 0 fits perfectly in the visible area:
+    ui.plot->graph(0)->rescaleAxes();
+    // same thing for graph 1, but only enlarge ranges (in case graph 1 is smaller than graph 0):
+    ui.plot->graph(1)->rescaleAxes(true);
+    //ui.plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
+    
+    
     Sentinel sentinel;
 
     uint32_t azimuth = sentinel.sentinel1PacketDecode.out.size();
@@ -104,5 +140,6 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     z->set_modifiers(Qt::NoModifier);
     ui.graphicsView->show();
     ui.graphicsView->rotate(90);
+    
 }
 

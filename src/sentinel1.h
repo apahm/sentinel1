@@ -139,7 +139,7 @@ public:
     Ipp8u* pRangeFFTSpec = nullptr;
     Ipp8u* pRangeFFTInitBuf = nullptr;
     Ipp8u* pRangeFFTWorkBuf = nullptr;
-    IppsDFTSpec_C_32fc* pRangeSpec = nullptr;
+    IppsFFTSpec_C_32fc* pRangeSpec = nullptr;
 
     int sizeAzimuthFFTSpec = 0;
     int sizeAzimuthFFTInitBuf = 0;
@@ -147,7 +147,7 @@ public:
     Ipp8u* pAzimuthFFTSpec = nullptr;
     Ipp8u* pAzimuthFFTInitBuf = nullptr;
     Ipp8u* pAzimuthFFTWorkBuf = nullptr;
-    IppsDFTSpec_C_32fc* pAzimuthSpec = nullptr;
+    IppsFFTSpec_C_32fc* pAzimuthSpec = nullptr;
 
     uint32_t fftLengthRange = 0.0;
     uint32_t fftSizeRange = 0.0;

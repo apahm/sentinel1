@@ -35,6 +35,10 @@ int CEOSFormat::parseVolumeDirectoryFile() {
     // Byte 9-12
     vol.read(reinterpret_cast<char*>(&tmp32), sizeof(tmp32));
     tmp32 = _byteswap_ulong(tmp32);
+    // Byte 13-14
+    vol.read(reinterpret_cast<char*>(&tmp16), sizeof(tmp16));
+    tmp16 = _byteswap_ulong(tmp16);
+
     // File pointer records 
     // Text record
     return 0;

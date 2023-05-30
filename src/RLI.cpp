@@ -23,7 +23,7 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     _scene = new QGraphicsScene();
     ui.graphicsView->setScene(_scene);
 
-    QImage image(azimuth, range, QImage::Format_RGB32);
+    QImage image(azimuth, range, QImage::Format_Grayscale8);
     
     float max = 0.0;
     
@@ -36,18 +36,17 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     
     for (int i = 0; i < azimuth; ++i) {
         for (int j = 0; j < range; ++j) {
-            image.setPixel(i, j, qRgb(std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)),
-                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)),
-                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2))));
+            image.setPixel(i, j, qRgb(std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255/max,
+                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max,
+                std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max));
         }
     }
 
     _item = new QGraphicsPixmapItem (QPixmap::fromImage(image));
     _scene->addItem(_item);
-    
+
     z = new Graphics_view_zoom(ui.graphicsView);
     z->set_modifiers(Qt::NoModifier);
     ui.graphicsView->show();
-    ui.graphicsView->rotate(90);
 }
 

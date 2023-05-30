@@ -96,6 +96,11 @@ target_sources(KeysightTechnologiesControl PRIVATE
     src/radarsat1.cpp
     src/qcustomplot.cpp
     src/qcustomplot.h
+    src/volume_dir_file.h
+    src/trl_file.h
+    src/dat_file.h
+    src/null_vol_dir_file.h
+    src/ldr_file.h
 )
 
 target_include_directories(KeysightTechnologiesControl PRIVATE  

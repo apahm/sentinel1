@@ -3,65 +3,45 @@
 
 Sentinel::Sentinel()
 {
-    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE.SAFE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
+    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
     sentinel1PacketDecode.getAuxData();
     calcParams();
 
     // Range direction
-    ippsFFTGetSize_C_32fc(fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
+    IppStatus st = ippsDFTGetSize_C_32fc(fftLengthRange, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
 
     pRangeFFTSpec = ippsMalloc_8u(sizeRangeFFTSpec);
     pRangeFFTInitBuf = ippsMalloc_8u(sizeRangeFFTInitBuf);
     pRangeFFTWorkBuf = ippsMalloc_8u(sizeRangeFFTWorkBuf);
 
-    ippsFFTInit_C_32fc(&pRangeSpec, fftSizeRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pRangeFFTSpec, pRangeFFTInitBuf);
+    st = ippsDFTInit_C_32fc(fftLengthRange, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pRangeSpec, pRangeFFTInitBuf);
 
     // Azimuth direction
-    ippsFFTGetSize_C_32fc(fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
+    ippsDFTGetSize_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
 
     pAzimuthFFTSpec = ippsMalloc_8u(sizeAzimuthFFTSpec);
     pAzimuthFFTInitBuf = ippsMalloc_8u(sizeAzimuthFFTInitBuf);
     pAzimuthFFTWorkBuf = ippsMalloc_8u(sizeAzimuthFFTWorkBuf);
 
-    ippsFFTInit_C_32fc(&pAzimuthSpec, fftSizeAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pAzimuthFFTSpec, pAzimuthFFTInitBuf);
+    ippsDFTInit_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pAzimuthSpec, pAzimuthFFTInitBuf);
     
     getRangeFilter();
 
-    Ipp32fc tmp;
-    tmp.re = 0.0;
-    tmp.im = 0.0;
-    std::vector<Ipp32fc> v;
-
-    for (size_t i = 0; i < sentinel1PacketDecode.out[0].size(); i++) {
-        v.push_back(tmp);
-    }
-
-    for (size_t j = sentinel1PacketDecode.out.size(); j < fftLengthAzimuth; j++) {
-        sentinel1PacketDecode.out.push_back(v);
-    }
-
-    for (size_t j = 0; j < fftLengthAzimuth; j++) {
-        for (size_t i = sentinel1PacketDecode.header[0].NumberOfQuads * 2; i < fftLengthRange; i++) {
-            sentinel1PacketDecode.out[j].push_back(tmp);
-        }
-    }
-
     for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
-        ippsFFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
+        ippsDFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
+        //ippsMul_32fc(sentinel1PacketDecode.out[i].data(), refFunc.data(), sentinel1PacketDecode.out[i].data(), fftLengthRange);
     }
-
     
-
-    for (size_t j = 0; j < fftLengthRange; j++) {
-        std::vector<Ipp32fc> az;
-        for (size_t i = 0; i < fftLengthAzimuth; i++) {
-            az.push_back(sentinel1PacketDecode.out[i][j]);
-        }
-        ippsFFTFwd_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
-        for (size_t i = 0; i < fftLengthAzimuth; i++) {
-            sentinel1PacketDecode.out[i][j] = az[i];
-        }
-    }
+    //for (size_t j = 0; j < fftLengthRange; j++) {
+    //    std::vector<Ipp32fc> az;
+    //    for (size_t i = 0; i < fftLengthAzimuth; i++) {
+    //        az.push_back(sentinel1PacketDecode.out[i][j]);
+    //    }
+    //    ippsDFTFwd_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
+    //    for (size_t i = 0; i < fftLengthAzimuth; i++) {
+    //        sentinel1PacketDecode.out[i][j] = az[i];
+    //    }
+    //}
 
 }
 
@@ -324,18 +304,16 @@ int Sentinel::getRangeFilter() {
         refFunc.push_back(tmp);
     }
 
-    ippsFFTFwd_CToC_32fc(refFunc.data(), refFunc.data(), pRangeSpec, pRangeFFTWorkBuf);
+    ippsDFTFwd_CToC_32fc(refFunc.data(), refFunc.data(), pRangeSpec, pRangeFFTWorkBuf);
 
     ippsConj_32fc(refFunc.data(), refFunc.data(), fftLengthRange);
     return 0;
 }
 
 int Sentinel::calcParams() {
-    fftSizeRange = std::log2(sentinel1PacketDecode.out[0].size()) + 1;
-    fftLengthRange = std::pow(2, fftSizeRange);
+    fftLengthRange = sentinel1PacketDecode.out[0].size();
 
-    fftSizeAzimuth = std::log2(sentinel1PacketDecode.out.size()) + 1;
-    fftLengthAzimuth = std::pow(2, fftSizeAzimuth);
+    fftLengthAzimuth = sentinel1PacketDecode.out.size();
 
     rangeSampleFreq = RangeDecimationToSampleRate(sentinel1PacketDecode.header[0].RangeDecimation);
     rangeSamplePeriod = 1.0 / rangeSampleFreq;

@@ -19,6 +19,12 @@ public:
     Sentinel();
 
     ~Sentinel();
+    void polyfit(const std::vector<double>& t, const std::vector<double>& v, std::vector<double>& coeff, int order);
+    void interp(const std::vector<double>& time,
+        const std::vector<double>& velocity,
+        const std::vector<double>& position,
+        std::vector<double>& coeffVelocity,
+        std::vector<double>& coeffPosition);
 
     float getNormSateliteVelocity(Sentinel1PacketDecode& sentinel1PacketDecode, uint64_t numberOfNavigPacket);
     float getNormGroundVelocity(Sentinel1PacketDecode& sentinel1PacketDecode);
@@ -116,6 +122,8 @@ public:
 
     int getRangeFilter();
 
+    void dopplerCentroidEstimation();
+    
     Sentinel1PacketDecode sentinel1PacketDecode;
     const double speedOfLight = 299792458.0;
     double rangeStartTime = 0.0;
@@ -124,10 +132,15 @@ public:
     double rangeSamplePeriod = 0.0;
     double azSampleFreq = 0.0;
     double azSamplePeriod = 0.0;
+
     std::vector<float> fastTime;
     std::vector<float> slantRange;
     std::vector<float> azimuthFreq;
-    std::vector<std::vector<float>> velocity;
+    std::vector<std::vector<float>> effectiveVelocity;
+    std::vector<double> timeS;
+    std::vector<double> velocity;
+    std::vector<double> position;
+    std::vector<std::complex<double>> dopplerCentroid;
 
     uint32_t rangeLengthBuffer = 0;
     uint32_t azimuthLengthBuffer = 0;

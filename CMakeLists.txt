@@ -133,7 +133,7 @@ target_link_libraries(KeysightTechnologiesControl PRIVATE
     #Boost::log_setup
 )
 
-target_include_directories(KeysightTechnologiesControl PRIVATE "../Eigen")
+target_include_directories(KeysightTechnologiesControl PRIVATE "Eigen")
 
 add_custom_command(
     TARGET KeysightTechnologiesControl POST_BUILD  

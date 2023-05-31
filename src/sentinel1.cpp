@@ -1,9 +1,11 @@
 #include "sentinel1.h"
 #include "ipp.h"
+#include <Dense>
+#include <QR>
 
 Sentinel::Sentinel()
 {
-    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
+    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE.SAFE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
     sentinel1PacketDecode.getAuxData();
     calcParams();
 
@@ -25,15 +27,54 @@ Sentinel::Sentinel()
 
     ippsDFTInit_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pAzimuthSpec, pAzimuthFFTInitBuf);
 
-    //getEffectiveVelocity(sentinel1PacketDecode);
+    std::vector<double> coeffVelocity;
+    std::vector<double> coeffPosition;
 
-    getRangeFilter();
+    interp(sentinel1PacketDecode.time, sentinel1PacketDecode.normOfVelocity, sentinel1PacketDecode.normOfPosition, coeffVelocity, coeffPosition);
 
-    for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
-        //ippsDFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
-        //ippsMul_32fc(sentinel1PacketDecode.out[i].data(), refFunc.data(), sentinel1PacketDecode.out[i].data(), fftLengthRange);
+    for (int p = 0; p < sentinel1PacketDecode.header.size(); p++)
+    {
+        double time = sentinel1PacketDecode.header.at(p).FineTime + static_cast<double>(sentinel1PacketDecode.header.at(p).Time);
+        timeS.push_back(time);
+
+        double vfitted = coeffVelocity[0] +
+            coeffVelocity[1] * time +
+            coeffVelocity[2] * (pow(time, 2)) +
+            coeffVelocity[3] * (pow(time, 3)) +
+            coeffVelocity[4] * (pow(time, 4)) +
+            coeffVelocity[5] * (pow(time, 5)) +
+            coeffVelocity[6] * (pow(time, 6)) +
+            coeffVelocity[7] * (pow(time, 7)) +
+            coeffVelocity[8] * (pow(time, 8)) +
+            coeffVelocity[9] * (pow(time, 9)) +
+            coeffVelocity[10] * (pow(time, 10));
+        velocity.push_back(vfitted);
+
+        vfitted = coeffPosition[0] +
+            coeffPosition[1] * time +
+            coeffPosition[2] * (pow(time, 2)) +
+            coeffPosition[3] * (pow(time, 3)) +
+            coeffPosition[4] * (pow(time, 4)) +
+            coeffPosition[5] * (pow(time, 5)) +
+            coeffPosition[6] * (pow(time, 6)) +
+            coeffPosition[7] * (pow(time, 7)) +
+            coeffPosition[8] * (pow(time, 8)) +
+            coeffPosition[9] * (pow(time, 9)) +
+            coeffPosition[10] * (pow(time, 10));
+        position.push_back(vfitted);
     }
 
+    //getEffectiveVelocity(sentinel1PacketDecode);
+    
+    //getRangeFilter();
+    //
+    //dopplerCentroidEstimation();
+    //
+    //for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
+    //    ippsDFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
+    //    ippsMul_32fc(sentinel1PacketDecode.out[i].data(), refFunc.data(), sentinel1PacketDecode.out[i].data(), fftLengthRange);
+    //}
+    //
     //for (size_t j = 0; j < fftLengthRange; j++) {
     //    std::vector<Ipp32fc> az;
     //    for (size_t i = 0; i < fftLengthAzimuth; i++) {
@@ -49,6 +90,65 @@ Sentinel::Sentinel()
 Sentinel::~Sentinel()
 {
 
+}
+
+void Sentinel::dopplerCentroidEstimation()
+{
+    for (size_t j = 0; j < fftLengthRange; j++) {
+        
+        std::vector<Ipp32fc> az;
+        
+        for (size_t i = 0; i < fftLengthAzimuth; i++) {
+            az.push_back(sentinel1PacketDecode.out[i][j]);
+        }
+
+        std::complex<double> res(0.0, 0.0);
+
+        for (size_t i = 0; i < fftLengthAzimuth - 1; i++) {
+            std::complex<double> oneTmp(az.at(i).re, az.at(i).im);
+            std::complex<double> twoTmp(az.at(i + 1).re, -az.at(i + 1).im);
+
+            res += oneTmp * twoTmp;
+        }
+
+        dopplerCentroid.push_back( - std::arg(res) / (2 * M_PI * sentinel1PacketDecode.header.at(0).PulseRepetitionInterval));
+    }
+    
+}
+
+void Sentinel::polyfit(const std::vector<double>& t, const std::vector<double>& v, std::vector<double>& coeff, int order) {
+    // Create Matrix Placeholder of size n x k, n= number of datapoints, k = order of polynomial, for exame k = 3 for cubic polynomial
+    Eigen::MatrixXd T(t.size(), order + 1);
+    Eigen::VectorXd V = Eigen::VectorXd::Map(&v.front(), v.size());
+    Eigen::VectorXd result;
+
+    // check to make sure inputs are correct
+    //assert(t.size() == v.size());
+    //assert(t.size() >= order + 1);
+    // Populate the matrix
+    for (size_t i = 0; i < t.size(); ++i)
+    {
+        for (size_t j = 0; j < order + 1; ++j)
+        {
+            T(i, j) = pow(t.at(i), j);
+        }
+    }
+    std::cout << T << std::endl;
+
+    // Solve for linear least square fit
+    result = T.householderQr().solve(V);
+    coeff.resize(order + 1);
+    for (int k = 0; k < order + 1; k++)
+    {
+        coeff[k] = result[k];
+    }
+
+}
+
+void Sentinel::interp(const std::vector<double>& time, const std::vector<double>& velocity, const std::vector<double>& position,
+                      std::vector<double>& coeffVelocity, std::vector<double>& coeffPosition) {
+    polyfit(time, velocity, coeffVelocity, 10);
+    polyfit(time, position, coeffPosition, 10);
 }
 
 void Sentinel::MeanOfRawData(ComplexMatrix& rawData, RawDataAnalysis& rawDataAnalysis) {
@@ -93,13 +193,13 @@ The Range-Doppler azimuth focusing can fully take into account this variation.
 
 The effective radar velocity is also azimuth dependent, as it depends on the satellite
 position in orbit and its height above the Earth. This dependency will be taken into
-account in IPF by updating r V for each azimuth block.
+account in IPF by updating V for each azimuth block.
 */
 
 float Sentinel::getEffectiveVelocity(Sentinel1PacketDecode& sentinel1PacketDecode) {
     for (size_t i = 0; i < fftLengthAzimuth; i++) {
-        float V = getNormSateliteVelocity(sentinel1PacketDecode, i);
-        float H = getNormSatelitePosition(sentinel1PacketDecode, i);
+        float V = velocity.at(i);
+        float H = position.at(i);
 
         float groundVelocity = 0.0;
 
@@ -118,16 +218,16 @@ float Sentinel::getEffectiveVelocity(Sentinel1PacketDecode& sentinel1PacketDecod
         double this_ground_velocity = 0.0;
         double effective_velocity = 0.0;
 
-        std::vector<float> effectiveVelocity;
+        std::vector<float> effectiveVelocityTemp;
 
         for (size_t j = 0; j < fftLengthRange; j++) {
             cos_beta = (local_earth_rad * local_earth_rad + H * H - slantRange[j] * slantRange[j]) / (2 * local_earth_rad * H);
             this_ground_velocity = local_earth_rad * V * cos_beta / H;
             effective_velocity = std::sqrt(V * this_ground_velocity);
-            effectiveVelocity.push_back(effective_velocity);
+            effectiveVelocityTemp.push_back(effective_velocity);
         }
 
-        velocity.emplace_back(effectiveVelocity);
+        effectiveVelocity.emplace_back(effectiveVelocityTemp);
     }
     
     return 0.0;

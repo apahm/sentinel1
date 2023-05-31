@@ -274,7 +274,7 @@ int Sentinel1PacketDecode::readRawPacket(std::filesystem::path pathToRawData) {
 					header.emplace_back(sentinelOneParam);
 					j += 1;
 					if (j == 16000) {
-						break;
+						//break;
 					}
 				}
 			}
@@ -442,9 +442,9 @@ void Sentinel1PacketDecode::getAuxData() {
 		normOfVelocity.push_back(std::sqrt(std::pow(positionVelocityTime.at(i).XvelocityECEF, 2) +
 											std::pow(positionVelocityTime.at(i).YvelocityECEF, 2) +
 											std::pow(positionVelocityTime.at(i).ZvelocityECEF, 2)));
-		normOfPosition.push_back(std::pow(positionVelocityTime.at(i).XAxisPositionECEF, 2) +
+		normOfPosition.push_back(std::sqrt(std::pow(positionVelocityTime.at(i).XAxisPositionECEF, 2) +
 								std::pow(positionVelocityTime.at(i).YAxisPositionECEF, 2) +
-								std::pow(positionVelocityTime.at(i).ZAxisPositionECEF, 2));
+								std::pow(positionVelocityTime.at(i).ZAxisPositionECEF, 2)));
 	}
 }
 
@@ -452,6 +452,7 @@ void Sentinel1PacketDecode::init_sequential_bit_function(sequential_bit_t* seq_s
 	seq_state->data = state._mmap_data;
 	seq_state->current_bit_count = 0;
 }
+
 void Sentinel1PacketDecode::consume_padding_bits(sequential_bit_t* s) {
 	auto byte_offset = static_cast<int>(((s->data) - (static_cast<uint8_t*>(state._mmap_data))));
 	// make sure we are at first bit of an even byte in the next read
@@ -471,6 +472,7 @@ void Sentinel1PacketDecode::consume_padding_bits(sequential_bit_t* s) {
 		s->current_bit_count = 0;
 	}
 }
+
 inline int Sentinel1PacketDecode::get_bit_rate_code(sequential_bit_t* s) {
 	// note: evaluation order is crucial
 	auto brc = ((((0x4) * (get_sequential_bit(s)))) +
@@ -483,6 +485,7 @@ inline int Sentinel1PacketDecode::get_bit_rate_code(sequential_bit_t* s) {
 	}
 	return brc;
 }
+
 inline int Sentinel1PacketDecode::decode_huffman_brc0(sequential_bit_t* s) {
 	if (get_sequential_bit(s)) {
 		if (get_sequential_bit(s)) {
@@ -501,6 +504,7 @@ inline int Sentinel1PacketDecode::decode_huffman_brc0(sequential_bit_t* s) {
 		return 0;
 	}
 }
+
 inline int Sentinel1PacketDecode::decode_huffman_brc1(sequential_bit_t* s) {
 	if (get_sequential_bit(s)) {
 		if (get_sequential_bit(s)) {
@@ -524,6 +528,7 @@ inline int Sentinel1PacketDecode::decode_huffman_brc1(sequential_bit_t* s) {
 		return 0;
 	}
 }
+
 inline int Sentinel1PacketDecode::decode_huffman_brc2(sequential_bit_t* s) {
 	if (get_sequential_bit(s)) {
 		if (get_sequential_bit(s)) {
@@ -557,6 +562,7 @@ inline int Sentinel1PacketDecode::decode_huffman_brc2(sequential_bit_t* s) {
 		return 0;
 	}
 }
+
 inline int Sentinel1PacketDecode::decode_huffman_brc3(sequential_bit_t* s) {
 	if (get_sequential_bit(s)) {
 		if (get_sequential_bit(s)) {
@@ -605,6 +611,7 @@ inline int Sentinel1PacketDecode::decode_huffman_brc3(sequential_bit_t* s) {
 		}
 	}
 }
+
 inline int Sentinel1PacketDecode::decode_huffman_brc4(sequential_bit_t* s) {
 	if (get_sequential_bit(s)) {
 		if (get_sequential_bit(s)) {

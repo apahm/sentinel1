@@ -254,7 +254,7 @@ struct ldr_pdr16_hist_rec {
     uint8_t rec_sub2;
     uint8_t rec_sub3;
     uint32_t length;
-    uint32_t rec_seq;
+    uint32_t rec_seqI4;
     uint32_t sar_chn;
     uint64_t ntab;
     uint64_t ltab;

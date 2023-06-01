@@ -273,8 +273,8 @@ int Sentinel1PacketDecode::readRawPacket(std::filesystem::path pathToRawData) {
 					out.push_back(output);
 					header.emplace_back(sentinelOneParam);
 					j += 1;
-					if (j == 16000) {
-						//break;
+					if (j == 8000) {
+						break;
 					}
 				}
 			}

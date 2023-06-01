@@ -68,7 +68,7 @@ public:
 
     bool checkRefFunc();
 
-    double MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity);
+    float MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity);
     
     template<typename T>
     T AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effectiveRadarVelocity, T slantRange);
@@ -80,37 +80,37 @@ public:
         float sampleRate = 0.0;
         switch (rangeDecimation) {
         case RangeDecimation::Filter0:
-            sampleRate = 3 * fRef;
+            sampleRate = 3.0 * fRef;
             break;
         case RangeDecimation::Filter1:
-            sampleRate = (8 / 3) * fRef;
+            sampleRate = (8.0 / 3.0) * fRef;
             break;
         case RangeDecimation::Filter3:
-            sampleRate = (20 / 9) * fRef;
+            sampleRate = (20.0 / 9.0) * fRef;
             break;
         case RangeDecimation::Filter4:
-            sampleRate = (16 / 9) * fRef;
+            sampleRate = (16.0 / 9.0) * fRef;
             break;
         case RangeDecimation::Filter5:
-            sampleRate = (3 / 2) * fRef;
+            sampleRate = (3.0 / 2.0) * fRef;
             break;
         case RangeDecimation::Filter6:
-            sampleRate = (4 / 3) * fRef;
+            sampleRate = (4.0 / 3.0) * fRef;
             break;
         case RangeDecimation::Filter7:
-            sampleRate = (2 / 3) * fRef;
+            sampleRate = (2.0 / 3.0) * fRef;
             break;
         case RangeDecimation::Filter8:
-            sampleRate = (12 / 7) * fRef;
+            sampleRate = (12.0 / 7.0) * fRef;
             break;
         case RangeDecimation::Filter9:
-            sampleRate = (5 / 4) * fRef;
+            sampleRate = (5.0 / 4.0) * fRef;
             break;
         case RangeDecimation::Filter10:
-            sampleRate = (6 / 13) * fRef;
+            sampleRate = (6.0 / 13.0) * fRef;
             break;
         case RangeDecimation::Filter11:
-            sampleRate = (16 / 11) * fRef;
+            sampleRate = (16.0 / 11.0) * fRef;
             break;
         default:
             break;

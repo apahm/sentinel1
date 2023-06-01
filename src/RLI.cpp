@@ -18,6 +18,16 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
 
     Sentinel sentinel;
 
+    QVector<double> x;
+    QVector<double> y0;
+    QVector<double> y1;
+
+    for (size_t i = 0; i < sentinel.fftLengthRange; i++) {
+        x.push_back(i);
+        y0.push_back(sentinel.refFunc[i].re);
+        y1.push_back(sentinel.refFunc[i].im);
+    }
+
     // add two new graphs and set their look:
     ui.plot->addGraph();
     ui.plot->graph(0)->setPen(QPen(Qt::blue)); // line color blue for first graph
@@ -34,8 +44,8 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     connect(ui.plot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui.plot->xAxis2, SLOT(setRange(QCPRange)));
     connect(ui.plot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui.plot->yAxis2, SLOT(setRange(QCPRange)));
     // pass data points to graphs:
-    ui.plot->graph(0)->setData(QVector<double>::fromStdVector(sentinel.sentinel1PacketDecode.time), QVector<double>::fromStdVector(sentinel.sentinel1PacketDecode.normOfPosition));
-    ui.plot->graph(1)->setData(QVector<double>::fromStdVector(sentinel.timeS), QVector<double>::fromStdVector(sentinel.position));
+    ui.plot->graph(0)->setData(x, y0);
+    ui.plot->graph(1)->setData(x, y1);
     // let the ranges scale themselves so graph 0 fits perfectly in the visible area:
     ui.plot->graph(0)->rescaleAxes();
     // same thing for graph 1, but only enlarge ranges (in case graph 1 is smaller than graph 0):
@@ -47,7 +57,7 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
 
     _scene = new QGraphicsScene();
     ui.graphicsView->setScene(_scene);
-
+    
     QImage image(azimuth, range, QImage::Format_Grayscale8);
     
     float max = 0.0;
@@ -61,7 +71,7 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     
     for (int i = 0; i < azimuth; ++i) {
         for (int j = 0; j < range; ++j) {
-            image.setPixel(i, j, qRgb(std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255/max,
+            image.setPixel(i, j, qRgb(std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255/ max,
                 std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max,
                 std::sqrt(std::pow(sentinel.sentinel1PacketDecode.out[i][j].re, 2) + std::pow(sentinel.sentinel1PacketDecode.out[i][j].im, 2)) * 255 / max));
         }
@@ -74,6 +84,5 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     z->set_modifiers(Qt::NoModifier);
     ui.graphicsView->show();
     ui.graphicsView->rotate(90);
-    
 }
 

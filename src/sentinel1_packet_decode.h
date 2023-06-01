@@ -72,17 +72,17 @@ enum class BAQMode {
 };
 
 enum class RangeDecimation {
-    Filter0,
-    Filter1,
-    Filter3,
-    Filter4,
-    Filter5,
-    Filter6,
-    Filter7,
-    Filter8,
-    Filter9,
-    Filter10,
-    Filter11
+    Filter0 = 0,
+    Filter1 = 1,
+    Filter3 = 3,
+    Filter4 = 4,
+    Filter5 = 5,
+    Filter6 = 6,
+    Filter7 = 7,
+    Filter8 = 8,
+    Filter9 = 9,
+    Filter10 = 10,
+    Filter11 = 11
 };
 
 enum class TemperatureCompensation {

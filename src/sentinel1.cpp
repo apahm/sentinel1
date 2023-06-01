@@ -10,22 +10,22 @@ Sentinel::Sentinel()
     calcParams();
 
     // Range direction
-    IppStatus st = ippsDFTGetSize_C_32fc(fftLengthRange, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
+    IppStatus st = ippsDFTGetSize_C_32fc(fftLengthRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeRangeFFTSpec, &sizeRangeFFTInitBuf, &sizeRangeFFTWorkBuf);
 
     pRangeSpec = (IppsDFTSpec_C_32fc*)ippsMalloc_8u(sizeRangeFFTSpec);
     pRangeFFTInitBuf = ippsMalloc_8u(sizeRangeFFTInitBuf);
     pRangeFFTWorkBuf = ippsMalloc_8u(sizeRangeFFTWorkBuf);
 
-    st = ippsDFTInit_C_32fc(fftLengthRange, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pRangeSpec, pRangeFFTInitBuf);
+    st = ippsDFTInit_C_32fc(fftLengthRange, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pRangeSpec, pRangeFFTInitBuf);
 
     // Azimuth direction
-    ippsDFTGetSize_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
+    ippsDFTGetSize_C_32fc(fftLengthAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, &sizeAzimuthFFTSpec, &sizeAzimuthFFTInitBuf, &sizeAzimuthFFTWorkBuf);
 
     pAzimuthSpec = (IppsDFTSpec_C_32fc*)ippsMalloc_8u(sizeAzimuthFFTSpec);
     pAzimuthFFTInitBuf = ippsMalloc_8u(sizeAzimuthFFTInitBuf);
     pAzimuthFFTWorkBuf = ippsMalloc_8u(sizeAzimuthFFTWorkBuf);
 
-    ippsDFTInit_C_32fc(fftLengthAzimuth, IPP_DIV_FWD_BY_N, ippAlgHintAccurate, pAzimuthSpec, pAzimuthFFTInitBuf);
+    ippsDFTInit_C_32fc(fftLengthAzimuth, IPP_NODIV_BY_ANY, ippAlgHintAccurate, pAzimuthSpec, pAzimuthFFTInitBuf);
 
     std::vector<double> coeffVelocity;
     std::vector<double> coeffPosition;
@@ -64,27 +64,39 @@ Sentinel::Sentinel()
         position.push_back(vfitted);
     }
 
-    //getEffectiveVelocity(sentinel1PacketDecode);
+    getEffectiveVelocity(sentinel1PacketDecode);
     
-    //getRangeFilter();
+    getRangeFilter();
+    
     //
     //dopplerCentroidEstimation();
     //
-    //for (size_t i = 0; i < sentinel1PacketDecode.out.size(); i++) {
-    //    ippsDFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
-    //    ippsMul_32fc(sentinel1PacketDecode.out[i].data(), refFunc.data(), sentinel1PacketDecode.out[i].data(), fftLengthRange);
-    //}
-    //
-    //for (size_t j = 0; j < fftLengthRange; j++) {
-    //    std::vector<Ipp32fc> az;
-    //    for (size_t i = 0; i < fftLengthAzimuth; i++) {
-    //        az.push_back(sentinel1PacketDecode.out[i][j]);
-    //    }
-    //    ippsDFTFwd_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
-    //    for (size_t i = 0; i < fftLengthAzimuth; i++) {
-    //        sentinel1PacketDecode.out[i][j] = az[i];
-    //    }
-    //}
+
+    for (size_t i = 0; i < fftLengthAzimuth; i++) {
+        st = ippsDFTFwd_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
+        st = ippsMul_32fc(sentinel1PacketDecode.out[i].data(), refFunc.data(), sentinel1PacketDecode.out[i].data(), fftLengthRange);
+        st = ippsDFTInv_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
+    }
+    
+    /*
+    for (size_t j = 0; j < fftLengthRange; j++) {
+        std::vector<Ipp32fc> az;
+        std::vector<Ipp32fc> azFilter;
+        Ipp32fc tmp;
+        for (size_t i = 0; i < fftLengthAzimuth; i++) {
+            az.push_back(sentinel1PacketDecode.out[i][j]);
+            tmp.re = cos(4 * M_PI * slantRange[j] * MigrationFactor(speedOfLight / wavelength, azimuthFreq[i], effectiveVelocity[i][j]) / wavelength);
+            tmp.im = sin(4 * M_PI * slantRange[j] * MigrationFactor(speedOfLight / wavelength, azimuthFreq[i], effectiveVelocity[i][j]) / wavelength);
+            azFilter.push_back(tmp);
+        }
+        ippsDFTFwd_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
+        ippsMul_32fc(az.data(), azFilter.data(), az.data(), fftLengthAzimuth);
+        ippsDFTInv_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
+        for (size_t i = 0; i < fftLengthAzimuth; i++) {
+            sentinel1PacketDecode.out[i][j] = az[i];
+        }
+    }
+    */
 }
 
 Sentinel::~Sentinel()
@@ -408,8 +420,12 @@ std::complex<double> Sentinel::NominalImageReplicaGeneration(T  TXPL, T TXPSF, T
     return std::exp(std::complex<double>(2 * M_PI * (((TXPSF - TXPRR * (-TXPL / 2)) * i + (TXPRR / 2) * std::pow(i, 2)))));
 }
 
-double Sentinel::MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity) {
-    return std::sqrt(1 - (std::pow(speedOfLight / carrierFrequency, 2) * std::pow(freqAzimuth, 2) / 4 * std::pow(effectiveRadarVelocity, 2)));
+float Sentinel::MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity) {
+    double x = std::pow(speedOfLight / carrierFrequency, 2) * std::pow(freqAzimuth, 2);
+    double y = 4 * std::pow(effectiveRadarVelocity, 2);
+    
+    double tmp = std::sqrt(1 - x / y);
+    return static_cast<float>(tmp);
 }
 
 template<typename T>

@@ -232,9 +232,9 @@ struct Sentinel1RawPacket {
     float TxPulseStartFreq;
     float TxPulseLength;
     uint8_t Rank;
-    float PulseRepetitionInterval;
-    float SamplingWindowStartTime;
-    float SamplingWindowLength;
+    double PulseRepetitionInterval;
+    double SamplingWindowStartTime;
+    double SamplingWindowLength;
     Polarisation Polarisation;
     bool SSBFlag;
     TemperatureCompensation  TemperatureCompensation;
@@ -287,9 +287,9 @@ public:
     float calcTxPulseRampRate(uint16_t rawTxPulseRampRate);
     float calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate);
     float calcTxPulseLength(uint32_t rawTxPulseStartFreq);
-    float calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval);
-    float calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime);
-    float calcSamplingWindowLength(uint32_t rawSamplingWindowLength);
+    double calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval);
+    double calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime);
+    double calcSamplingWindowLength(uint32_t rawSamplingWindowLength);
     float calcFineTime(uint16_t rawFineTime);
     uint32_t calcInstrumentConfigID(uint32_t rawInstrumentConfigID);
     uint32_t read24Bit(std::ifstream& f);

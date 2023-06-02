@@ -25,7 +25,7 @@ float Sentinel1PacketDecode::calcTxPulseRampRate(uint16_t rawTxPulseRampRate) {
 
 float Sentinel1PacketDecode::calcTxPulseStartFreq(uint16_t rawTxPulseStartFreq, float TxPulseRampRate) {
     rawTxPulseStartFreq = _byteswap_ushort(rawTxPulseStartFreq);
-    float fRef = 37.53472224;
+	double fRef = 37.53472224;
     uint8_t sign = std::bitset<16>(rawTxPulseStartFreq)[15];
     uint16_t value = rawTxPulseStartFreq & 0x7FFF;
     return TxPulseRampRate / (4 * fRef) + std::pow(-1, sign) * static_cast<float>(value) * fRef * std::pow(2, -14);
@@ -36,19 +36,19 @@ float Sentinel1PacketDecode::calcTxPulseLength(uint32_t rawTxPulseStartFreq) {
     return static_cast<float>(rawTxPulseStartFreq)  / fRef;
 }
 
-float Sentinel1PacketDecode::calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval) {
-    float fRef = 37.53472224;
-    return static_cast<float>(rawPulseRepetitionInterval) * 1e-6 / fRef;
+double Sentinel1PacketDecode::calcPulseRepetitionInterval(uint32_t rawPulseRepetitionInterval) {
+    double fRef = 37.53472224;
+    return (rawPulseRepetitionInterval) * 1e-6 / fRef;
 }
 
-float Sentinel1PacketDecode::calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime) {
-    float fRef = 37.53472224;
-    return static_cast<float>(rawSamplingWindowStartTime) * 1e-6 / fRef;
+double Sentinel1PacketDecode::calcSamplingWindowStartTime(uint32_t rawSamplingWindowStartTime) {
+	double fRef = 37.53472224;
+    return (rawSamplingWindowStartTime) * 1e-6 / fRef;
 }
 
-float Sentinel1PacketDecode::calcSamplingWindowLength(uint32_t rawSamplingWindowLength) {
-    float fRef = 37.53472224;
-    return static_cast<float>(rawSamplingWindowLength) / fRef;
+double Sentinel1PacketDecode::calcSamplingWindowLength(uint32_t rawSamplingWindowLength) {
+	double fRef = 37.53472224;
+    return (rawSamplingWindowLength) / fRef;
 }
 
 float Sentinel1PacketDecode::calcFineTime(uint16_t rawFineTime) {
@@ -273,7 +273,7 @@ int Sentinel1PacketDecode::readRawPacket(std::filesystem::path pathToRawData) {
 					out.push_back(output);
 					header.emplace_back(sentinelOneParam);
 					j += 1;
-					if (j == 8000) {
+					if (j == 20000) {
 						break;
 					}
 				}

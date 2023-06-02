@@ -68,7 +68,7 @@ public:
 
     bool checkRefFunc();
 
-    float MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity);
+    double MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity);
     
     template<typename T>
     T AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effectiveRadarVelocity, T slantRange);
@@ -133,10 +133,10 @@ public:
     double azSampleFreq = 0.0;
     double azSamplePeriod = 0.0;
 
-    std::vector<float> fastTime;
-    std::vector<float> slantRange;
-    std::vector<float> azimuthFreq;
-    std::vector<std::vector<float>> effectiveVelocity;
+    std::vector<double> fastTime;
+    std::vector<double> slantRange;
+    std::vector<double> azimuthFreq;
+    std::vector<std::vector<double>> effectiveVelocity;
     std::vector<double> timeS;
     std::vector<double> velocity;
     std::vector<double> position;

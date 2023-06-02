@@ -5,7 +5,7 @@
 
 Sentinel::Sentinel()
 {
-    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE.SAFE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
+    sentinel1PacketDecode.readRawPacket("C:/S1A_S3_RAW__0SDH_20220710T213600_20220710T213625_044043_0541DB_56CE/s1a-s3-raw-s-hh-20220710t213600-20220710t213625-044043-0541db.dat");
     sentinel1PacketDecode.getAuxData();
     calcParams();
 
@@ -78,15 +78,20 @@ Sentinel::Sentinel()
         st = ippsDFTInv_CToC_32fc(sentinel1PacketDecode.out[i].data(), sentinel1PacketDecode.out[i].data(), pRangeSpec, pRangeFFTWorkBuf);
     }
     
-    /*
+    
     for (size_t j = 0; j < fftLengthRange; j++) {
         std::vector<Ipp32fc> az;
         std::vector<Ipp32fc> azFilter;
         Ipp32fc tmp;
         for (size_t i = 0; i < fftLengthAzimuth; i++) {
             az.push_back(sentinel1PacketDecode.out[i][j]);
-            tmp.re = cos(4 * M_PI * slantRange[j] * MigrationFactor(speedOfLight / wavelength, azimuthFreq[i], effectiveVelocity[i][j]) / wavelength);
-            tmp.im = sin(4 * M_PI * slantRange[j] * MigrationFactor(speedOfLight / wavelength, azimuthFreq[i], effectiveVelocity[i][j]) / wavelength);
+
+            double arg_mig = MigrationFactor(speedOfLight / wavelength, azimuthFreq[i], effectiveVelocity[i][j]);
+
+            double arg_s = slantRange[j] * arg_mig;
+
+            tmp.re = cos(4 * M_PI * arg_s / wavelength);
+            tmp.im = sin(4 * M_PI * arg_s / wavelength);
             azFilter.push_back(tmp);
         }
         ippsDFTFwd_CToC_32fc(az.data(), az.data(), pAzimuthSpec, pAzimuthFFTWorkBuf);
@@ -96,7 +101,7 @@ Sentinel::Sentinel()
             sentinel1PacketDecode.out[i][j] = az[i];
         }
     }
-    */
+    
 }
 
 Sentinel::~Sentinel()
@@ -230,7 +235,7 @@ float Sentinel::getEffectiveVelocity(Sentinel1PacketDecode& sentinel1PacketDecod
         double this_ground_velocity = 0.0;
         double effective_velocity = 0.0;
 
-        std::vector<float> effectiveVelocityTemp;
+        std::vector<double> effectiveVelocityTemp;
 
         for (size_t j = 0; j < fftLengthRange; j++) {
             cos_beta = (local_earth_rad * local_earth_rad + H * H - slantRange[j] * slantRange[j]) / (2 * local_earth_rad * H);
@@ -420,12 +425,12 @@ std::complex<double> Sentinel::NominalImageReplicaGeneration(T  TXPL, T TXPSF, T
     return std::exp(std::complex<double>(2 * M_PI * (((TXPSF - TXPRR * (-TXPL / 2)) * i + (TXPRR / 2) * std::pow(i, 2)))));
 }
 
-float Sentinel::MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity) {
+double Sentinel::MigrationFactor(double carrierFrequency, double freqAzimuth, double effectiveRadarVelocity) {
     double x = std::pow(speedOfLight / carrierFrequency, 2) * std::pow(freqAzimuth, 2);
     double y = 4 * std::pow(effectiveRadarVelocity, 2);
     
     double tmp = std::sqrt(1 - x / y);
-    return static_cast<float>(tmp);
+    return tmp;
 }
 
 template<typename T>
@@ -434,8 +439,8 @@ T Sentinel::AzimuthFMRate(T carrierFrequency, T frequencyDopplerCentroid, T effe
 }
 
 int Sentinel::getRangeFilter() {
-    double TXPRR = 1e12 * sentinel1PacketDecode.header[0].TxRampRate;
-    double TXPSF = 1e6 * sentinel1PacketDecode.header[0].TxPulseStartFreq;
+    double TXPRR = -1e12 * sentinel1PacketDecode.header[0].TxRampRate;
+    double TXPSF = -1e6 * sentinel1PacketDecode.header[0].TxPulseStartFreq;
     double TXPL = 1e-6 * sentinel1PacketDecode.header[0].TxPulseLength;
 
     Ipp32fc tmp;

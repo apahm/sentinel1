@@ -83,6 +83,6 @@ RLI::RLI(QWidget *parent): QMainWindow(parent) {
     z = new Graphics_view_zoom(ui.graphicsView);
     z->set_modifiers(Qt::NoModifier);
     ui.graphicsView->show();
-    ui.graphicsView->rotate(90);
+    ui.graphicsView->rotate(270);
 }
 
